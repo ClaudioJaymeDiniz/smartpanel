@@ -1,18 +1,41 @@
-import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { useEffect } from 'react';
 import { Stack } from 'expo-router';
+import * as SplashScreen from 'expo-splash-screen';
+import { 
+  useFonts, 
+  PlusJakartaSans_700Bold, 
+  PlusJakartaSans_500Medium, 
+  PlusJakartaSans_400Regular 
+} from '@expo-google-fonts/plus-jakarta-sans';
+import { 
+  Manrope_400Regular, 
+  Manrope_600SemiBold 
+} from '@expo-google-fonts/manrope';
 
-export const unstable_settings = {
-  // Ensure that reloading on `/modal` keeps a back button present.
-  initialRouteName: '(drawer)',
-};
+// Impede a Splash Screen de sumir sozinha
+SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
+  const [loaded, error] = useFonts({
+    'Jakarta-Bold': PlusJakartaSans_700Bold,
+    'Jakarta-Medium': PlusJakartaSans_500Medium,
+    'Jakarta-Regular': PlusJakartaSans_400Regular,
+    'Manrope-Regular': Manrope_400Regular,
+    'Manrope-SemiBold': Manrope_600SemiBold,
+  });
+
+  useEffect(() => {
+    if (loaded || error) {
+      SplashScreen.hideAsync();
+    }
+  }, [loaded, error]);
+
+  if (!loaded && !error) return null;
+
   return (
-    <GestureHandlerRootView style={{ flex: 1 }}>
-      <Stack>
-        <Stack.Screen name="(drawer)" options={{ headerShown: false }} />
-        <Stack.Screen name="modal" options={{ title: 'Modal', presentation: 'modal' }} />
-      </Stack>
-    </GestureHandlerRootView>
+    <Stack screenOptions={{ headerShown: false }}>
+      <Stack.Screen name="(auth)" />
+      <Stack.Screen name="(drawer)" />
+    </Stack>
   );
 }
