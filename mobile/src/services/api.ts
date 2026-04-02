@@ -3,7 +3,8 @@ import * as SecureStore from 'expo-secure-store';
 
 export const api = axios.create({
   // Verifique seu IP com 'hostname -I' no terminal do Mint
-  baseURL: 'http://192.168.137.140:8001', 
+  //baseURL: 'http://192.168.137.140:8001', 
+  baseURL: 'http://192.168.18.14:8001',
 });
 
 api.interceptors.request.use(

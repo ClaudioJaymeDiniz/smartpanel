@@ -1,13 +1,22 @@
-import { StyleSheet, SafeAreaView } from 'react-native';
+import React from 'react';
+import { View, StyleSheet, ViewProps } from 'react-native';
 
-export const Container = ({ children }: { children: React.ReactNode }) => {
-  return <SafeAreaView style={styles.container}>{children}</SafeAreaView>;
-};
+interface ContainerProps extends ViewProps {
+  children: React.ReactNode;
+}
+
+export default function Container({ children, style, ...rest }: ContainerProps) {
+  return (
+    <View style={[styles.container, style]} {...rest}>
+      {children}
+    </View>
+  );
+}
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 24,
-    backgroundColor: 'white',
+    paddingHorizontal: 20, // O "respiro" lateral padrão do app
+    width: '100%',
   },
 });
