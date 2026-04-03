@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { 
   View, Text, StyleSheet, TouchableOpacity, 
-  SafeAreaView, ActivityIndicator, Alert, ScrollView 
+  ActivityIndicator, Alert, ScrollView 
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { FontAwesome5 } from '@expo/vector-icons';
 
