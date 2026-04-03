@@ -31,7 +31,7 @@ export default function TabLayout() {
         }}
       />
       
-      {/* Sugestão: Uma aba dedicada apenas para a lista de projetos */}
+      {/* Sugestão: Uma aba dedicada apenas para a lista de projetos
       <Tabs.Screen
         name="projects" 
         options={{
@@ -40,12 +40,12 @@ export default function TabLayout() {
             <Ionicons name={focused ? "folder-open" : "folder-outline"} size={24} color={color} />
           ),
         }}
-      />
+      /> */}
 
       <Tabs.Screen
         name="settings"
         options={{
-          title: 'Ajustes',
+          title: 'Configurações',
           tabBarIcon: ({ color, focused }) => (
             <Ionicons name={focused ? "settings" : "settings-outline"} size={24} color={color} />
           ),
