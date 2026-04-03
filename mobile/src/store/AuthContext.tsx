@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import * as SecureStore from 'expo-secure-store';
 import * as SQLite from 'expo-sqlite';
 import NetInfo from '@react-native-community/netinfo';
@@ -9,15 +9,14 @@ interface AuthContextData {
   signed: boolean;
   user: any;
   loading: boolean;
-  isOffline: boolean; // Novo: Indica se o app está sem rede
+  isOffline: boolean;
   signIn: (credentials: any) => Promise<void>;
-  signOut: () => void;
-  syncOfflineData: () => Promise<void>; // Novo: Função para disparar o sync manualmente
+  signOut: () => Promise<void>; // Ajustado para Promise
+  syncOfflineData: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextData>({} as AuthContextData);
 
-// Abre o banco local SmartPanel
 const db = SQLite.openDatabaseSync('smartpanel.db');
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -28,9 +27,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const segments = useSegments();
   const router = useRouter();
 
-  // 1. Inicializa Banco de Dados e Monitora Rede
+  // 1. Inicializa Banco e Monitora Rede
   useEffect(() => {
-    // Cria tabelas para Cache e Fila de Sincronismo
     db.execSync(`
       CREATE TABLE IF NOT EXISTS projects_cache (
         id TEXT PRIMARY KEY,
@@ -46,43 +44,43 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       );
     `);
 
-    // Monitor de Conexão
     const unsubscribe = NetInfo.addEventListener(state => {
       const offline = !state.isConnected;
       setIsOffline(offline);
-      
-      // Se a internet voltou e temos um usuário, tenta sincronizar
-      if (!offline && user) {
-        syncOfflineData();
-      }
     });
 
     return () => unsubscribe();
-  }, [user]);
+  }, []);
 
-  // 2. Carrega Dados Iniciais (Token)
+  // 2. Tenta sincronizar quando a rede volta e o user está logado
+  useEffect(() => {
+    if (!isOffline && user) {
+      syncOfflineData();
+    }
+  }, [isOffline, user]);
+
+  // 3. Carrega Dados Iniciais
   useEffect(() => {
     async function loadStorageData() {
-      const storageToken = await SecureStore.getItemAsync('user_token');
-      
-      if (storageToken) {
-        try {
+      try {
+        const storageToken = await SecureStore.getItemAsync('user_token');
+        if (storageToken) {
           const response = await api.get('/auth/me');
           setUser(response.data);
-        } catch (error) {
-          // Se estiver offline, não deletamos o token, apenas mantemos o que temos
-          const state = await NetInfo.fetch();
-          if (state.isConnected) {
-            await SecureStore.deleteItemAsync('user_token');
-          }
         }
+      } catch (error) {
+        const state = await NetInfo.fetch();
+        if (state.isConnected) {
+          await SecureStore.deleteItemAsync('user_token');
+        }
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
     }
     loadStorageData();
   }, []);
 
-  // 3. Proteção de Rotas
+  // 4. Proteção de Rotas
   useEffect(() => {
     if (loading) return;
     const inAuthGroup = segments[0] === '(auth)';
@@ -94,21 +92,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, [user, segments, loading]);
 
-  // 4. Lógica de Sincronismo
   const syncOfflineData = async () => {
-    const queue: any[] = db.getAllSync('SELECT * FROM sync_queue');
-    
-    if (queue.length === 0) return;
+    try {
+      const queue: any[] = db.getAllSync('SELECT * FROM sync_queue');
+      if (queue.length === 0) return;
 
-    console.log(`[SmartPanel] Sincronizando ${queue.length} itens...`);
-
-    for (const item of queue) {
-      try {
+      console.log(`[SmartPanel] Sincronizando ${queue.length} itens...`);
+      for (const item of queue) {
         await api.post(item.endpoint, JSON.parse(item.payload));
         db.runSync('DELETE FROM sync_queue WHERE id = ?', [item.id]);
-      } catch (err) {
-        console.error("Erro ao sincronizar item:", err);
       }
+    } catch (err) {
+      console.error("Erro ao sincronizar:", err);
     }
   };
 
@@ -117,7 +112,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const formData = new URLSearchParams();
       formData.append('username', credentials.email);
       formData.append('password', credentials.password);
-      formData.append('grant_type', 'password');
 
       const response = await api.post('/auth/login', formData, {
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -135,8 +129,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const signOut = async () => {
-    await SecureStore.deleteItemAsync('user_token');
-    setUser(null);
+    try {
+      await SecureStore.deleteItemAsync('user_token');
+      setUser(null);
+      // O useEffect de Proteção de Rotas cuidará do redirecionamento
+    } catch (error) {
+      console.error("Erro ao deslogar:", error);
+    }
   };
 
   return (

@@ -11,6 +11,7 @@ import {
   Manrope_400Regular, 
   Manrope_600SemiBold 
 } from '@expo-google-fonts/manrope';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { AuthProvider } from '@/src/store/AuthContext';
 
@@ -34,12 +35,15 @@ export default function RootLayout() {
   if (!loaded && !error) return null;
 
   return (
-    <AuthProvider>
-      <Stack screenOptions={{ headerShown: false }}>
-        {/* Aqui o Stack vai decidir se mostra o (auth) ou o (drawer) */}
-        <Stack.Screen name="(auth)" />
-        <Stack.Screen name="(drawer)" />
-      </Stack>
-    </AuthProvider>
+    <SafeAreaProvider>
+      <AuthProvider>
+        <Stack screenOptions={{ headerShown: false }}>
+          {/* Aqui o Stack vai decidir se mostra o (auth) ou o (drawer) */}
+          <Stack.Screen name="(auth)" />
+          <Stack.Screen name="(drawer)" />
+          <Stack.Screen name="(form)" />
+        </Stack>
+      </AuthProvider>
+    </SafeAreaProvider>
   );
 }

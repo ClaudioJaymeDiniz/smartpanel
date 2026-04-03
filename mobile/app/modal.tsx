@@ -1,3 +1,4 @@
+
 import { StatusBar } from 'expo-status-bar';
 import { Platform, StyleSheet, Text, View } from 'react-native';
 
@@ -15,7 +16,8 @@ export default function Modal() {
       <StatusBar style={Platform.OS === 'ios' ? 'light' : 'auto'} />
     </View>
   );
-}
+} 
+
 
 const styles = StyleSheet.create({
   container: {
@@ -41,3 +43,4 @@ const styles = StyleSheet.create({
     color: '#666',
   }
 });
+

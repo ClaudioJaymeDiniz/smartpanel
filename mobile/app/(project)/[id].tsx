@@ -8,6 +8,7 @@ import { COLORS } from '@/src/styles/colors';
 import Container from '@/src/components/common/Container';
 import { api } from '@/src/services/api';
 import { useAuth } from '@/src/store/AuthContext';
+import { formService } from '@/src/services/formService';
 
 interface FormItem {
   id: string;
@@ -28,24 +29,31 @@ export default function ProjectDetails() {
   const [projectColor, setProjectColor] = useState(COLORS.primary);
 
   const fetchProjectData = async () => {
-    try {
-      // Busca simultânea: Formulários e Detalhes do Projeto (para pegar a cor)
+  setLoading(true);
+  try {
+    if (isOffline) {
+      // Busca do SQLite via service que criamos
+      const offlineForms = await formService.getProjectForms(id as string, true);
+      setForms(offlineForms);
+      // Aqui você pode definir uma cor padrão ou buscar do cache do projeto
+      setProjectColor(THEME.colors.primary); 
+    } else {
       const [formsRes, projectRes] = await Promise.all([
         api.get(`/projects/${id}/forms`),
         api.get(`/projects/${id}`)
       ]);
-
       setForms(formsRes.data);
       if (projectRes.data.themeColor) {
         setProjectColor(projectRes.data.themeColor);
       }
-    } catch (error) {
-      console.error("Erro ao carregar dados do projeto:", error);
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
     }
-  };
+  } catch (error) {
+    console.error("Erro ao carregar dados:", error);
+  } finally {
+    setLoading(false);
+    setRefreshing(false);
+  }
+};
 
   useEffect(() => {
     fetchProjectData();
@@ -56,21 +64,28 @@ export default function ProjectDetails() {
     fetchProjectData();
   };
 
-  const renderFormItem = ({ item }: any) => (
-    <TouchableOpacity 
-      style={styles.formCard}
-      onPress={() => router.push(`/(project)/form/${item.id}`)}
+  const renderFormItem = ({ item }: { item: FormItem }) => (
+  <TouchableOpacity 
+    style={styles.formCard}
+    onPress={() => router.push(`/(form)/${item.id}`)}
     >
-      <View style={[styles.iconBox, { backgroundColor: projectColor + '15' }]}>
-        <Ionicons name="document-text" size={22} color={projectColor} />
-      </View>
-      <View style={styles.formInfo}>
-        <Text style={styles.formTitle}>{item.title}</Text>
+    <View style={[styles.iconBox, { backgroundColor: projectColor + '15' }]}>
+      <Ionicons name="document-text" size={22} color={projectColor} />
+    </View>
+    <View style={styles.formInfo}>
+      <Text style={styles.formTitle} numberOfLines={1}>{item.title}</Text>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
         <Text style={styles.formMeta}>{item.responses_count || 0} envios</Text>
+        {/* Indicador visual de atividade */}
+        {(item.responses_count || 0) > 0 && (
+           <View style={{ width: 4, height: 4, borderRadius: 2, backgroundColor: COLORS.border }} />
+        )}
+        <Text style={styles.formMeta}>Criado em {new Date().toLocaleDateString('pt-BR')}</Text>
       </View>
-      <Ionicons name="chevron-forward" size={20} color={COLORS.border} />
-    </TouchableOpacity>
-  );
+    </View>
+    <Ionicons name="chevron-forward" size={20} color={COLORS.border} />
+  </TouchableOpacity>
+);
 
   return (
     <View style={styles.mainContainer}>
@@ -97,7 +112,7 @@ export default function ProjectDetails() {
           
           <TouchableOpacity 
             style={[styles.addButton, { backgroundColor: projectColor }]}
-            onPress={() => router.push(`/(project)/new-form?projectId=${id}`)}
+            onPress={() => router.push(`/(form)/new?projectId=${id}`)}
           >
             <Ionicons name="add" size={28} color="#FFF" />
           </TouchableOpacity>
