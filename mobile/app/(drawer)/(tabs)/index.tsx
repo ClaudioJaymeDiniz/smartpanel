@@ -100,6 +100,7 @@ export default function Home() {
                         size={30} 
                         color={item.themeColor || THEME.colors.primary} 
                       />
+                      
                       <Text style={styles.projectLabel} numberOfLines={1}>{item.name}</Text>
                     </TouchableOpacity>
                   ))

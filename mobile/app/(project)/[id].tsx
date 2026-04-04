@@ -19,6 +19,7 @@ interface FormItem {
 
 
 export default function ProjectDetails() {
+  //const cleanId = (id as string).replace(/\/$/, "");
   const { id, name } = useLocalSearchParams();
   const { isOffline } = useAuth();
   const router = useRouter();
@@ -28,27 +29,33 @@ export default function ProjectDetails() {
   const [forms, setForms] = useState<FormItem[]>([]);
   const [projectColor, setProjectColor] = useState(COLORS.primary);
 
-  const fetchProjectData = async () => {
+const fetchProjectData = async () => {
   setLoading(true);
   try {
     if (isOffline) {
-      // Busca do SQLite via service que criamos
       const offlineForms = await formService.getProjectForms(id as string, true);
-      setForms(offlineForms);
-      // Aqui você pode definir uma cor padrão ou buscar do cache do projeto
-      setProjectColor(THEME.colors.primary); 
+      setForms(offlineForms || []);
     } else {
-      const [formsRes, projectRes] = await Promise.all([
-        api.get(`/projects/${id}/forms`),
-        api.get(`/projects/${id}`)
-      ]);
-      setForms(formsRes.data);
-      if (projectRes.data.themeColor) {
-        setProjectColor(projectRes.data.themeColor);
+      // Usamos try/catch individuais ou tratamos as respostas separadamente
+      try {
+        const formsRes = await api.get(`/forms/project/${id}`);
+        setForms(Array.isArray(formsRes.data) ? formsRes.data : []);
+      } catch (fErr: any) {
+        console.error("Erro nos formulários:", fErr.error.message);
+      }
+
+      try {
+        const projectRes = await api.get(`/projects/${id}`);
+        if (projectRes.data?.themeColor) {
+          setProjectColor(projectRes.data.themeColor);
+        }
+      } catch (pErr: any) {
+        console.error("Erro no projeto (405?):", pErr.error.message);
+        // Mantém a cor padrão se esta rota falhar
       }
     }
-  } catch (error) {
-    console.error("Erro ao carregar dados:", error);
+  } catch (error: any) {
+    console.error("Erro Geral:", error.message);
   } finally {
     setLoading(false);
     setRefreshing(false);
