@@ -1,6 +1,6 @@
 # SmartForms
 
-## 📌 Descrição
+## Descrição
 
 O **SmartForms** é um sistema completo para criação, gerenciamento e análise de formulários dinâmicos. A aplicação permite que usuários criem projetos, desenvolvam formulários personalizados e coletem respostas de forma estruturada, incluindo suporte a envio de imagens e visualização em dashboards.
 
@@ -8,9 +8,9 @@ O sistema foi projetado com foco em **usabilidade (no-code)**, **arquitetura lim
 
 ---
 
-## 🎯 Objetivo
+## Objetivo
 
-Desenvolver uma aplicação mobile e backend robusto capaz de:
+Desenvolver uma aplicação mobile e backend capaz de:
 
 * Criar formulários dinâmicos
 * Gerenciar projetos e usuários
@@ -20,7 +20,7 @@ Desenvolver uma aplicação mobile e backend robusto capaz de:
 
 ---
 
-## 🧱 Arquitetura do Sistema
+## Arquitetura do Sistema
 
 O projeto segue os princípios de **Clean Architecture**, garantindo separação de responsabilidades:
 
@@ -36,7 +36,7 @@ O projeto segue os princípios de **Clean Architecture**, garantindo separação
 
 * API RESTful
 * Autenticação com JWT
-* Banco relacional (PostgreSQL)
+* Banco relacional (PostgreSQL / SUPABASE)
 * ORM: Prisma
 * Armazenamento de imagens em nuvem (planejado)
 
@@ -50,7 +50,7 @@ O projeto segue os princípios de **Clean Architecture**, garantindo separação
 
 ---
 
-## 🚀 Planejamento por Sprints
+## Planejamento por Sprints
 
 ---
 
@@ -69,13 +69,13 @@ Construir a base funcional do sistema, permitindo criação e resposta de formul
 * Envio de respostas
 * Validação de campos obrigatórios
 
-### 🧠 Tecnologias aplicadas
+### Tecnologias aplicadas
 
 * JWT para autenticação
 * Estrutura dinâmica de formulários (JSON)
 * Renderização condicional no mobile
 
-### 🎯 Resultado
+###  Resultado
 
 Sistema funcional similar a um **Google Forms básico**, permitindo criação e coleta de dados.
 
@@ -97,13 +97,13 @@ Adicionar controle de acesso e ferramentas de análise.
 * Exclusão lógica (lixeira)
 * Compartilhamento por link
 
-### 🧠 Tecnologias aplicadas
+### Tecnologias aplicadas
 
 * Controle de permissões por usuário
 * Soft delete (arquivamento)
 * Processamento de dados para exportação
 
-### 🎯 Resultado
+###  Resultado
 
 Sistema evolui para um produto utilizável em cenários reais.
 
@@ -133,14 +133,14 @@ Escalar o sistema com funcionalidades avançadas e melhor experiência do usuár
 * Sistema de times
 * Webhooks
 
-### 🧠 Tecnologias aplicadas
+###  Tecnologias aplicadas
 
 * Armazenamento em nuvem (Cloudinary/Firebase)
 * Processamento assíncrono
 * Geração de relatórios
 * Integrações externas
 
-### 🎯 Resultado
+### Resultado
 
 Sistema completo com características de um **SaaS profissional de formulários**.
 
