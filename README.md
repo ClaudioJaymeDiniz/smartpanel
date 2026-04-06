@@ -1,4 +1,4 @@
-# 📱 SmartForms
+# SmartForms
 
 ## 📌 Descrição
 
