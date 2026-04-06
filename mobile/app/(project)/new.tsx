@@ -1,68 +1,134 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TextInput, TouchableOpacity, Alert, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, TextInput, TouchableOpacity, ScrollView, ActivityIndicator } from 'react-native';
 import { useRouter, Stack } from 'expo-router';
-import { COLORS } from '@/src/styles/colors';
-import { THEME } from '@/src/styles/theme';
-import { projectService } from '@/src/services/projectService';
-import { useAuth } from '@/src/store/AuthContext';
+import { Ionicons } from '@expo/vector-icons';
+
+import { THEME } from '@/styles/theme';
+import Container from '@/components/common/Container';
+import SmartAlert from '@/components/common/SmartAlert';
+import { useAlert } from '@/presentation/shared/hooks/useAlert';
+import { ProjectRepositoryImpl } from '@/data/projects/repositories/ProjectRepositoryImpl';
+
+// Cores sugeridas para o seletor
+const PRESET_COLORS = ['#3B82F6','#F59E0B', '#EF4444', '#8B5CF6', '#99ccff', '#000000'];
 
 export default function NewProject() {
   const router = useRouter();
-  const { isOffline } = useAuth();
-  
+  const { alertConfig, showAlert, hideAlert } = useAlert();
+  const projectRepo = new ProjectRepositoryImpl();
+
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
-  const [themeColor, setThemeColor] = useState('#3B82F6'); 
+  const [themeColor, setThemeColor] = useState('#3B82F6');
+  const [loading, setLoading] = useState(false);
 
   const handleCreate = async () => {
-    if (!name.trim()) return Alert.alert("Ops", "Dê um nome ao projeto.");
+    if (!name.trim()) {
+      return showAlert("Atenção", "O nome do projeto é obrigatório.");
+    }
 
+    setLoading(true);
     try {
-      await projectService.create({ name, description, themeColor }, isOffline);
-      router.replace('/(drawer)/(tabs)'); 
-    } catch (error: any) {
-      console.log("Erro no servidor:", error.response?.data);
-      Alert.alert("Erro", "Falha ao criar projeto. Verifique os dados.");
+      await projectRepo.create({
+        name,
+        description,
+        themeColor: themeColor,
+      });
+
+      showAlert("Sucesso!", "Projeto criado com sucesso.", () => {
+        router.replace('/(drawer)/(tabs)');
+      });
+    } catch (error) {
+      showAlert("Erro", "Não foi possível criar o projeto agora.");
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
-    <ScrollView style={{ flex: 1, backgroundColor: COLORS.background }}>
+    <View style={styles.mainContainer}>
       <Stack.Screen options={{ title: 'Novo Projeto' }} />
-      <View style={{ padding: 20 }}>
-        <Text style={styles.label}>Nome do Projeto</Text>
-        <TextInput 
-          style={styles.input}
-          value={name}
-          onChangeText={setName} // LIBERADO PARA DIGITAR
-          placeholder="Ex: Minha Empresa"
-          placeholderTextColor={COLORS.textSecondary}
-        />
+      <SmartAlert {...alertConfig} onCancel={hideAlert} />
 
-        <Text style={styles.label}>Cor do Tema (Hex)</Text>
-        <View style={styles.colorRow}>
-          <TextInput 
-            style={[styles.input, { flex: 1 }]}
-            value={themeColor}
-            onChangeText={setThemeColor}
-            placeholder="#FFD700"
-          />
-          <View style={[styles.colorBox, { backgroundColor: themeColor }]} />
-        </View>
+      <ScrollView contentContainerStyle={{ paddingBottom: 40 }}>
+        <Container>
+          <View style={styles.form}>
+            <Text style={styles.label}>Nome do Projeto</Text>
+            <TextInput 
+              style={styles.input}
+              value={name}
+              onChangeText={setName}
+              placeholder="Ex: Inventário de TI"
+              placeholderTextColor={THEME.colors.textSecondary}
+            />
 
-        <TouchableOpacity style={styles.btn} onPress={handleCreate}>
-          <Text style={styles.btnText}>Criar Projeto</Text>
-        </TouchableOpacity>
-      </View>
-    </ScrollView>
+            <Text style={styles.label}>Descrição (Opcional)</Text>
+            <TextInput 
+              style={[styles.input, styles.textArea]}
+              value={description}
+              onChangeText={setDescription}
+              placeholder="Para que serve este projeto?"
+              multiline
+              numberOfLines={3}
+            />
+
+            <Text style={styles.label}>Cor do Tema</Text>
+            <View style={styles.colorGrid}>
+              {PRESET_COLORS.map(color => (
+                <TouchableOpacity 
+                  key={color}
+                  style={[styles.colorOption, { backgroundColor: color }, themeColor === color && styles.colorActive]}
+                  onPress={() => setThemeColor(color)}
+                >
+                  {themeColor === color && <Ionicons name="checkmark" size={20} color="#FFF" />}
+                </TouchableOpacity>
+              ))}
+              {/* Campo para cor customizada */}
+              <View style={styles.customColorRow}>
+                 <TextInput 
+                  style={styles.customColorInput}
+                  value={themeColor}
+                  onChangeText={setThemeColor}
+                  placeholder="#Hex"
+                 />
+                 <View style={[styles.colorPreview, { backgroundColor: themeColor }]} />
+              </View>
+            </View>
+
+            <TouchableOpacity 
+              style={[styles.btn, loading && { opacity: 0.7 }]} 
+              onPress={handleCreate}
+              disabled={loading}
+            >
+              {loading ? <ActivityIndicator color="#FFF" /> : <Text style={styles.btnText}>Criar Projeto</Text>}
+            </TouchableOpacity>
+          </View>
+        </Container>
+      </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  label: { ...THEME.fonts.body, marginTop: 20, marginBottom: 8 },
-  input: { backgroundColor: COLORS.surface, padding: 15, borderRadius: 12, borderWidth: 1, borderColor: COLORS.border, color: COLORS.textPrimary },
-  colorRow: { flexDirection: 'row', gap: 10, alignItems: 'center' },
-  colorBox: { width: 50, height: 50, borderRadius: 12, borderWidth: 1, borderColor: COLORS.border },
-  btn: { backgroundColor: COLORS.primary, padding: 18, borderRadius: 15, marginTop: 40, alignItems: 'center' },
+  mainContainer: { flex: 1, backgroundColor: THEME.colors.background },
+  form: { marginTop: 20 },
+  label: { ...THEME.fonts.body, fontFamily: 'Manrope-Bold', marginBottom: 8, marginTop: 15 },
+  input: { 
+    backgroundColor: THEME.colors.surface, 
+    padding: 15, 
+    borderRadius: 14, 
+    borderWidth: 1, 
+    borderColor: THEME.colors.border, 
+    color: THEME.colors.textPrimary,
+    fontFamily: 'Manrope-Regular'
+  },
+  textArea: { height: 80, textAlignVertical: 'top' },
+  colorGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginTop: 10, justifyContent: 'center' },
+  colorOption: { width: 44, height: 44, borderRadius: 22, justifyContent: 'center', alignItems: 'center' },
+  colorActive: { borderWidth: 3, borderColor: THEME.colors.textPrimary },
+  customColorRow: { flexDirection: 'row', alignItems: 'center', gap: 10, width: '100%', marginTop: 5 },
+  customColorInput: { flex: 1, backgroundColor: THEME.colors.inputBg, padding: 10, borderRadius: 10, fontFamily: 'Manrope-Regular' },
+  colorPreview: { width: 40, height: 40, borderRadius: 10 },
+  btn: { backgroundColor: THEME.colors.primary, padding: 18, borderRadius: 16, marginTop: 40, alignItems: 'center' },
   btnText: { ...THEME.fonts.button }
 });

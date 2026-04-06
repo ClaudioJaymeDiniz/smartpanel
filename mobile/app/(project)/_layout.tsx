@@ -1,5 +1,5 @@
 import { Stack, useLocalSearchParams } from 'expo-router';
-import { COLORS } from '@/src/styles/colors';
+import { COLORS } from '@/styles/colors';
 
 export default function ProjectLayout() {
   const { id, name } = useLocalSearchParams();

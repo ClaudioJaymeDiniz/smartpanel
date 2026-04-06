@@ -7,42 +7,37 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { FontAwesome5 } from '@expo/vector-icons';
 
-import CustomInput from '@/src/components/common/CustomInput';
-import Logo from '@/src/components/common/Logo';
-import DeveloperFooter from '@/src/components/common/DeveloperFooter';
-import { THEME } from '@/src/styles/theme';
-import { useAuth } from '@/src/store/AuthContext';
+import CustomInput from '@/components/common/CustomInput';
+import Logo from '@/components/common/Logo';
+import DeveloperFooter from '@/components/common/DeveloperFooter';
+import { THEME } from '@/styles/theme';
+import { useLogin } from '@/presentation/auth/hooks/useLogin';
+import { useAlert } from '@/presentation/shared/hooks/useAlert';
+import SmartAlert from '@/components/common/SmartAlert';
 
 export default function LoginScreen() {
+  const { email, setEmail, password, setPassword, loading, handleLogin } = useLogin();
   const router = useRouter();
-  const { signIn } = useAuth();
-  
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [loading, setLoading] = useState(false);
+  const { alertConfig, showAlert, hideAlert } = useAlert();
 
-  const handleLogin = async () => {
-    if (!email || !password) {
-      Alert.alert("Campos Vazios", "Por favor, insira e-mail e senha.");
-      return;
-    }
-
-    setLoading(true);
+  const handleLoginLocal = async () => {
     try {
-      // Aqui acontece a mágica com o seu FastAPI (via api.ts + Interceptor)
-      await signIn({ email, password });
-      // Se der certo, o AuthContext muda o estado e o RootLayout te joga para o Drawer
-    } catch (error: any) {
-      console.error(error);
-      Alert.alert("Falha no Login", "Verifique suas credenciais ou a conexão com o servidor.");
-    } finally {
-      setLoading(false);
+      await handleLogin();
+    } catch (e) {
+      
+      showAlert("Falha no Acesso", "E-mail ou senha incorretos. Verifique e tente novamente.");
     }
   };
 
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView contentContainerStyle={styles.scrollContent}>
+       {/* O componente fica "escondido" esperando o showAlert ser chamado */}
+       <SmartAlert 
+          {...alertConfig} 
+          onCancel={hideAlert} 
+       />
+      <ScrollView>
+
         <View style={styles.content}>
           
           {/* Logo Centralizado */}

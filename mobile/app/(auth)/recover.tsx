@@ -3,45 +3,50 @@ import { View, Text, StyleSheet, TextInput, TouchableOpacity, Alert, ActivityInd
 import { useRouter, Stack } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
-import { COLORS } from '@/src/styles/colors';
-import { THEME } from '@/src/styles/theme';
-import Container from '@/src/components/common/Container';
-import { api } from '@/src/services/api';
-
+import { COLORS } from '@/styles/colors';
+import { THEME } from '@/styles/theme';
+import Container from '@/components/common/Container';
+import { useAlert } from '@/presentation/shared/hooks/useAlert';
+import SmartAlert from '@/components/common/SmartAlert';
+import { AuthRepositoryImpl } from '@/data/auth/repositories/AuthRepositoryImpl';
 
 export default function RecoverPassword() {
   const router = useRouter();
+  const { alertConfig, showAlert, hideAlert } = useAlert(); // 1. Hook
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
 
   const handleRecover = async () => {
-  if (!email.includes('@')) {
-    return Alert.alert("E-mail inválido", "Por favor, insira um e-mail real.");
-  }
+    if (!email.includes('@')) {
+      showAlert("E-mail inválido", "Por favor, insira um endereço de e-mail real.");
+      return;
+    }
 
-  setLoading(true);
-  try {
-    // Agora o 'api' será reconhecido
-    await api.post('/auth/recover-password', { email: email.trim() });
-    
-    Alert.alert(
-      "Link Enviado", 
-      "Se este e-mail estiver cadastrado, você receberá instruções em breve.",
-      [{ text: "OK", onPress: () => router.back() }]
-    );
-  } catch (error: any) {
-    console.error("Erro na recuperação:", error.response?.data);
-    Alert.alert(
-      "Ops!", 
-      "Não foi possível processar a solicitação agora. Tente novamente mais tarde."
-    );
-  } finally {
-    setLoading(false);
-  }
-};
+    setLoading(true);
+    try {
+      const authRepo = new AuthRepositoryImpl();
+      await authRepo.recoverPassword(email.trim());
+      
+      // 2. Confirmação de envio
+      showAlert(
+        "Link Enviado", 
+        "Se este e-mail estiver cadastrado, as instruções chegarão em instantes.",
+        () => router.back() // Volta para o login após o OK
+      );
+    } catch (error: any) {
+      showAlert(
+        "Ops!", 
+        "Não foi possível processar a solicitação agora. Verifique sua conexão."
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <Container style={styles.wrapper}>
+      <SmartAlert {...alertConfig} onCancel={hideAlert} />
+      
       <Stack.Screen options={{ title: 'Recuperar Senha', headerTransparent: true, headerTitle: '' }} />
       
       <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>

@@ -1,5 +1,5 @@
 import { Stack } from 'expo-router';
-import { THEME } from '@/src/styles/theme';
+import { THEME } from '@/styles/theme';
 
 export default function FormLayout() {
   return (

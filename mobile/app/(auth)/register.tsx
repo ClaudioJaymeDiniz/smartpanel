@@ -14,14 +14,18 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
-import { api } from '@/src/services/api';
-import CustomInput from '@/src/components/common/CustomInput';
-import Logo from '@/src/components/common/Logo';
-import DeveloperFooter from '@/src/components/common/DeveloperFooter';
-import { THEME } from '@/src/styles/theme';
+import { api } from '@/services/api';
+import CustomInput from '@/components/common/CustomInput';
+import Logo from '@/components/common/Logo';
+import DeveloperFooter from '@/components/common/DeveloperFooter';
+import { THEME } from '@/styles/theme';
+import { AuthRepositoryImpl } from '@/data/auth/repositories/AuthRepositoryImpl';
+import { useAlert } from '@/presentation/shared/hooks/useAlert';
+import SmartAlert from '@/components/common/SmartAlert';
 
 export default function RegisterScreen() {
-  const router = useRouter();
+ const router = useRouter();
+  const { alertConfig, showAlert, hideAlert } = useAlert(); // 1. Inicializa o Alerta
   
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -29,40 +33,55 @@ export default function RegisterScreen() {
   const [loading, setLoading] = useState(false);
 
   const handleRegister = async () => {
-    if (!name || !email || !password) {
-      Alert.alert("Campos Vazios", "Por favor, preencha todos os dados.");
-      return;
+  if (!name || !email || !password) {
+    showAlert("Campos Vazios", "Por favor, preencha todos os dados para continuar.");
+    return;
+  }
+
+  setLoading(true);
+  try {
+    const authRepo = new AuthRepositoryImpl();
+    await authRepo.register({ email, name, password });
+
+    showAlert(
+      "Sucesso!", 
+      "Sua conta foi criada. Agora você já pode acessar o painel.",
+      () => router.replace('/(auth)/login')
+    );
+  } catch (error: any) {
+    // 1. Extraímos o detalhe do erro vindo do FastAPI
+    const rawDetail = error.response?.data?.detail;
+    let errorMsg = "Erro ao conectar com o servidor.";
+
+    // 2. Lógica para "limpar" o erro 422 do Pydantic
+    if (typeof rawDetail === 'string') {
+      errorMsg = rawDetail;
+    } else if (Array.isArray(rawDetail)) {
+      // O FastAPI costuma mandar uma lista de erros. Pegamos a 'msg' do primeiro.
+      // Ex: "field required" ou "value is not a valid email"
+      const firstError = rawDetail[0];
+      errorMsg = firstError?.msg || "Erro de validação nos dados.";
+      
+      // Opcional: Se quiser mostrar qual campo errou (ex: "email: value is not a valid email")
+      if (firstError?.loc) {
+        const field = firstError.loc[firstError.loc.length - 1];
+        errorMsg = `${field}: ${errorMsg}`;
+      }
+    } else if (rawDetail?.msg) {
+      errorMsg = rawDetail.msg;
     }
 
-    setLoading(true);
-    try {
-      const payload = {
-        email,
-        name,
-        password,
-        provider: 'local',
-      };
-
-      // Chamada para o seu FastAPI no Linux Mint
-      await api.post('/auth/register', payload);
-
-      Alert.alert("Sucesso", "Conta criada com sucesso! Agora você pode acessar o painel.");
-      router.replace('/(auth)/login');
-    } catch (error: any) {
-      const errorMsg = error.response?.data?.detail || "Erro ao conectar com o servidor.";
-      Alert.alert("Erro no Cadastro", errorMsg);
-    } finally {
-      setLoading(false);
-    }
-  };
+    showAlert("Erro no Cadastro", errorMsg);
+  } finally {
+    setLoading(false);
+  }
+};
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* KeyboardAvoidingView evita que o teclado cubra os inputs no Android */}
-      <KeyboardAvoidingView 
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        style={{ flex: 1 }}
-      >
+      <SmartAlert {...alertConfig} onCancel={hideAlert} />
+      
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
         <ScrollView contentContainerStyle={styles.scrollContent}>
           
           {/* Botão Voltar */}

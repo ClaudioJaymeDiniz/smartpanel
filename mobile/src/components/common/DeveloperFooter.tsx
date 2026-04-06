@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { THEME } from '@/src/styles/theme';
+import { THEME } from '@/styles/theme';
 
 export default function DeveloperFooter() {
   return (

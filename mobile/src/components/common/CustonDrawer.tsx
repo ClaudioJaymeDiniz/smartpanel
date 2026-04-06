@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, StyleSheet, Text } from 'react-native';
 import { DrawerContentScrollView, DrawerItemList } from '@react-navigation/drawer';
-import { THEME } from '@/src/styles/theme';
+import { THEME } from '@/styles/theme';
 import Logo from './Logo';
 
 export default function CustomDrawer(props: any) {
