@@ -90,7 +90,7 @@ Adicionar controle de acesso e ferramentas de análise.
 ### ✅ Funcionalidades
 
 * Formulários públicos e privados
-* Cadastro de respondentes
+* Cadastro de membros
 * Dashboard de respostas
 * Exportação de dados (CSV)
 * Filtros de respostas
