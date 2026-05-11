@@ -21,17 +21,47 @@ export class FormRepositoryImpl implements IFormRepository {
   async create(data: FormCreate): Promise<Form> {
     try {
       const response = await api.post('/forms/', data);
-      return FormMapper.toDomain(response.data);
+      const created = response.data;
+
+      try {
+        db.runSync(
+          'INSERT OR REPLACE INTO forms_cache (id, projectId, data) VALUES (?, ?, ?)',
+          [created.id, created.projectId, JSON.stringify(created)]
+        );
+      } catch (cacheError) {
+        console.warn('Erro ao salvar formulario no cache:', cacheError);
+      }
+
+      return FormMapper.toDomain(created);
     } catch (error) {
+      const tempId = `temp-form-${Date.now()}`;
+
       // Offline: Salva na fila para o useSync criar no backend depois
       db.runSync(
         'INSERT INTO sync_queue (endpoint, payload, method, status) VALUES (?, ?, ?, ?)',
         ['/forms/', JSON.stringify(data), 'POST', 'pending']
       );
 
+      // Salva imediatamente no cache de formularios para aparecer offline.
+      const localForm = {
+        id: tempId,
+        ...data,
+        createdAt: new Date().toISOString(),
+        deletedAt: null,
+      };
+
+      try {
+        db.runSync(
+          'INSERT OR REPLACE INTO forms_cache (id, projectId, data) VALUES (?, ?, ?)',
+          [tempId, data.projectId, JSON.stringify(localForm)]
+        );
+      } catch (cacheError) {
+        console.warn('Erro ao salvar formulario offline no cache:', cacheError);
+      }
+
       // Retorna um objeto temporário para a interface
       return {
-        id: `temp-form-${Date.now()}`,
+        id: tempId,
         ...data,
         createdAt: new Date(),
         deletedAt: null,
@@ -48,10 +78,15 @@ export class FormRepositoryImpl implements IFormRepository {
       // Sincroniza o cache local de formulários para este projeto
       try {
         db.runSync('DELETE FROM forms WHERE project_id = ?', [projectId]);
+        db.runSync('DELETE FROM forms_cache WHERE projectId = ?', [projectId]);
         for (const f of forms) {
           db.runSync(
             'INSERT OR REPLACE INTO forms (id, project_id, title, data) VALUES (?, ?, ?, ?)',
             [f.id, projectId, f.title || f.name, JSON.stringify(f)]
+          );
+          db.runSync(
+            'INSERT OR REPLACE INTO forms_cache (id, projectId, data) VALUES (?, ?, ?)',
+            [f.id, projectId, JSON.stringify(f)]
           );
         }
       } catch (cacheError) {
@@ -100,8 +135,8 @@ export class FormRepositoryImpl implements IFormRepository {
     // SALVA NO CACHE PARA USO FUTURO OFFLINE
     try {
       db.runSync(
-        'INSERT OR REPLACE INTO forms_cache (id, data) VALUES (?, ?)',
-        [id, JSON.stringify(formData)]
+        'INSERT OR REPLACE INTO forms_cache (id, projectId, data) VALUES (?, ?, ?)',
+        [id, formData.projectId || null, JSON.stringify(formData)]
       );
     } catch (cacheError) {
       console.warn("Erro ao salvar form no cache:", cacheError);

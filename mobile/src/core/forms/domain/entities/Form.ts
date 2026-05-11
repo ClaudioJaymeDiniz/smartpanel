@@ -25,6 +25,7 @@ export interface Form {
   projectId: string;
   createdAt: Date;
   deletedAt: Date | null;
+  submissionCount?: number;
 }
 
 export interface FormCreate {

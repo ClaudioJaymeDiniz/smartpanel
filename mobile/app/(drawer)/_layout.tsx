@@ -4,6 +4,7 @@ import { Drawer } from 'expo-router/drawer';
 import { DrawerContentScrollView, DrawerItem } from '@react-navigation/drawer';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import * as SecureStore from 'expo-secure-store';
 
 import { useAuthStore } from '@/presentation/auth/store/useAuthStore';
 import { useAlert } from '@/presentation/shared/hooks/useAlert';
@@ -22,7 +23,14 @@ function CustomDrawerContent(props: any) {
     showAlert(
       "Sair da Conta", 
       "Deseja realmente encerrar sua sessão no SmartPanel?", 
-      () => logout(),
+      async () => {
+        await Promise.all([
+          SecureStore.deleteItemAsync('user_token'),
+          SecureStore.deleteItemAsync('auth_user_cache'),
+          SecureStore.deleteItemAsync('auth_login_cache'),
+        ]);
+        logout();
+      },
       'confirm'
     );
   };

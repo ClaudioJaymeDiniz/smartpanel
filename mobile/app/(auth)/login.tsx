@@ -12,11 +12,13 @@ import Logo from '@/components/common/Logo';
 import DeveloperFooter from '@/components/common/DeveloperFooter';
 import { THEME } from '@/styles/theme';
 import { useLogin } from '@/presentation/auth/hooks/useLogin';
+import { useGoogleLogin } from '@/presentation/auth/hooks/useGoogleLogin';
 import { useAlert } from '@/presentation/shared/hooks/useAlert';
 import SmartAlert from '@/components/common/SmartAlert';
 
 export default function LoginScreen() {
   const { email, setEmail, password, setPassword, loading, handleLogin } = useLogin();
+  const { loading: googleLoading, handleGoogleLogin } = useGoogleLogin();
   const router = useRouter();
   const { alertConfig, showAlert, hideAlert } = useAlert();
 
@@ -93,11 +95,18 @@ export default function LoginScreen() {
           {/* Botões Sociais Largos */}
         <View style={styles.socialContainer}>
           <TouchableOpacity 
-            onPress={() => console.log('Google Login')} 
+            onPress={handleGoogleLogin}
+            disabled={googleLoading}
             style={[styles.socialButton, { borderColor: '#DB4437' }]}
           >
-            <FontAwesome5 name="google" size={18} color="#DB4437" />
-            <Text style={styles.socialButtonText}>Entrar com Google</Text>
+            {googleLoading ? (
+              <ActivityIndicator color="#DB4437" />
+            ) : (
+              <>
+                <FontAwesome5 name="google" size={18} color="#DB4437" />
+                <Text style={styles.socialButtonText}>Entrar com Google</Text>
+              </>
+            )}
           </TouchableOpacity>
 
           <TouchableOpacity 

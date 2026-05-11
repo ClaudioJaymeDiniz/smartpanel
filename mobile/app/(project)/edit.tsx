@@ -19,19 +19,21 @@ export default function EditProject() {
 
   const [loading, setLoading] = useState(true);
   const [saveLoading, setSaveLoading] = useState(false);
+  const [actionLoading, setActionLoading] = useState(false);
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [themeColor, setThemeColor] = useState('#3B82F6');
+  const [isArchived, setIsArchived] = useState(false);
 
   useEffect(() => {
     const loadProject = async () => {
       try {
-        const all = await projectRepo.listActive();
-        const current = all.find((p: any) => p.id === id);
+        const current = await projectRepo.findById(id as string);
         if (current) {
           setName(current.name);
           setDescription(current.description || '');
           setThemeColor(current.color || current.themeColor || '#3B82F6');
+          setIsArchived(Boolean((current as any).deletedAt));
         }
       } catch (e) {
         showAlert("Erro", "Não foi possível carregar os dados do projeto.");
@@ -61,6 +63,34 @@ export default function EditProject() {
       showAlert("Erro", "Falha ao atualizar o projeto.");
     } finally {
       setSaveLoading(false);
+    }
+  };
+
+  const handleArchive = async () => {
+    setActionLoading(true);
+    try {
+      await projectRepo.archive(id as string);
+      showAlert("Sucesso", "Projeto arquivado com sucesso.", () => {
+        router.replace('/(drawer)/(tabs)');
+      });
+    } catch (error) {
+      showAlert("Erro", "Falha ao arquivar o projeto.");
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handlePermanentDelete = async () => {
+    setActionLoading(true);
+    try {
+      await projectRepo.permanentDelete(id as string);
+      showAlert("Sucesso", "Projeto excluído definitivamente.", () => {
+        router.replace('/(drawer)/(tabs)');
+      });
+    } catch (error: any) {
+      showAlert("Erro", error?.message || "Para excluir definitivamente, arquive primeiro.");
+    } finally {
+      setActionLoading(false);
     }
   };
 
@@ -106,13 +136,25 @@ export default function EditProject() {
               {saveLoading ? <ActivityIndicator color="#FFF" /> : <Text style={styles.saveText}>Salvar Alterações</Text>}
             </TouchableOpacity>
 
-            <TouchableOpacity 
-              style={styles.archiveBtn} 
-              onPress={() => showAlert("Aviso", "A função de arquivar estará disponível na próxima versão do backend.")}
-            >
-              <Ionicons name="archive-outline" size={20} color="#94A3B8" />
-              <Text style={styles.archiveText}>Arquivar Projeto</Text>
-            </TouchableOpacity>
+            {!isArchived ? (
+              <TouchableOpacity 
+                style={styles.archiveBtn} 
+                onPress={handleArchive}
+                disabled={actionLoading}
+              >
+                {actionLoading ? <ActivityIndicator color="#94A3B8" /> : <Ionicons name="archive-outline" size={20} color="#94A3B8" />}
+                <Text style={styles.archiveText}>Arquivar Projeto</Text>
+              </TouchableOpacity>
+            ) : (
+              <TouchableOpacity 
+                style={styles.deleteBtn} 
+                onPress={handlePermanentDelete}
+                disabled={actionLoading}
+              >
+                {actionLoading ? <ActivityIndicator color="#EF4444" /> : <Ionicons name="trash-outline" size={20} color="#EF4444" />}
+                <Text style={styles.deleteText}>Excluir definitivamente</Text>
+              </TouchableOpacity>
+            )}
           </View>
         </Container>
       </ScrollView>
@@ -146,4 +188,13 @@ const styles = StyleSheet.create({
     padding: 10
   },
   archiveText: { color: '#94A3B8', fontFamily: 'Manrope-SemiBold' }
+  ,deleteBtn: {
+    marginTop: 25,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    padding: 10
+  },
+  deleteText: { color: '#EF4444', fontFamily: 'Manrope-SemiBold' }
 });

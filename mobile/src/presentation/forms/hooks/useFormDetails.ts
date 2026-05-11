@@ -16,6 +16,7 @@ export function useFormDetails(formId: string, userId?: string) {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [isOwner, setIsOwner] = useState(false);
+  const [isProjectArchived, setIsProjectArchived] = useState(false);
 
   const loadData = useCallback(async () => {
     if (!refreshing) setLoading(true);
@@ -32,8 +33,10 @@ export function useFormDetails(formId: string, userId?: string) {
       if (userId && formData?.projectId) {
         const projectData = await projectRepo.findById(formData.projectId);
         setIsOwner(projectData?.ownerId === userId);
+        setIsProjectArchived(Boolean(projectData?.deletedAt));
       } else {
         setIsOwner(false);
+        setIsProjectArchived(false);
       }
     } finally {
       setLoading(false);
@@ -49,6 +52,7 @@ export function useFormDetails(formId: string, userId?: string) {
     loading,
     refreshing,
     isOwner,
+    isProjectArchived,
     mySubmission,
     setRefreshing,
     loadData,

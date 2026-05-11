@@ -1,8 +1,10 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter, useSegments, Stack } from 'expo-router';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
+import * as SecureStore from 'expo-secure-store';
+import * as NetInfo from '@react-native-community/netinfo';
 
 // Fontes
 import { 
@@ -35,22 +37,67 @@ export default function RootLayout() {
     'Manrope-SemiBold': Manrope_600SemiBold,
   });
 
-  const { isAuthenticated } = useAuthStore();
-  const { syncPendingActions } = useSync();
+  const { isAuthenticated, setUser } = useAuthStore();
+  const { syncPendingActions, clearLegacySyncQueue } = useSync();
   const segments = useSegments();
   const router = useRouter();
+  const [authHydrated, setAuthHydrated] = useState(false);
+
+  // 0. Hidrata sessao local para permitir entrar no app offline.
+  useEffect(() => {
+    let mounted = true;
+
+    const hydrateAuth = async () => {
+      try {
+        const [token, cachedUserRaw] = await Promise.all([
+          SecureStore.getItemAsync('user_token'),
+          SecureStore.getItemAsync('auth_user_cache'),
+        ]);
+
+        if (token && cachedUserRaw) {
+          const cachedUser = JSON.parse(cachedUserRaw);
+          setUser({
+            ...cachedUser,
+            createdAt: cachedUser.createdAt ? new Date(cachedUser.createdAt) : new Date(),
+          });
+        }
+      } catch (error) {
+        console.warn('Falha ao restaurar sessao local:', error);
+      } finally {
+        if (mounted) setAuthHydrated(true);
+      }
+    };
+
+    hydrateAuth();
+
+    return () => {
+      mounted = false;
+    };
+  }, [setUser]);
 
   // 2. Inicialização do Banco e Sync
   useEffect(() => {
     initDatabase();
     if (isAuthenticated) {
+      clearLegacySyncQueue();
       syncPendingActions();
     }
-  }, [isAuthenticated]);
+  }, [isAuthenticated, syncPendingActions, clearLegacySyncQueue]);
+
+  // 2.1 Sincroniza novamente quando a conexao volta.
+  useEffect(() => {
+    const unsubscribe = NetInfo.addEventListener((state) => {
+      if (state.isConnected && isAuthenticated) {
+        syncPendingActions();
+      }
+    });
+
+    return () => unsubscribe();
+  }, [isAuthenticated, syncPendingActions]);
 
   // 3. Proteção de Rotas (Auth Guard)
   useEffect(() => {
-    if (!fontsLoaded) return;
+    if (!fontsLoaded || !authHydrated) return;
 
     const inAuthGroup = segments[0] === '(auth)';
 
@@ -61,9 +108,9 @@ export default function RootLayout() {
     }
     
     SplashScreen.hideAsync();
-  }, [isAuthenticated, segments, fontsLoaded]);
+  }, [isAuthenticated, segments, fontsLoaded, authHydrated, router]);
 
-  if (!fontsLoaded && !fontError) return null;
+  if ((!fontsLoaded || !authHydrated) && !fontError) return null;
 
   return (
     <SafeAreaProvider style={{ backgroundColor: THEME.colors.background }}>
@@ -74,7 +121,6 @@ export default function RootLayout() {
       }}>
         <Stack.Screen name="(auth)" />
         <Stack.Screen name="(drawer)" />
-        <Stack.Screen name="(form)" />
         <Stack.Screen name="modal" options={{ presentation: 'modal' }} />
       </Stack>
     </SafeAreaProvider>

@@ -53,6 +53,13 @@ export const initDatabase = () => {
       // Ignora se a coluna já existir
     }
 
+    try {
+      // Migra bancos antigos que foram criados antes da coluna projectId existir.
+      db.execSync("ALTER TABLE forms_cache ADD COLUMN projectId TEXT;");
+    } catch (e) {
+      // Ignora se a coluna já existir.
+    }
+
     console.log("✅ Database initialized successfully");
   } catch (error) {
     console.error("❌ Error initializing database:", error);

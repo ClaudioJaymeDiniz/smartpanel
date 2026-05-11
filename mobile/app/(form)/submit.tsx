@@ -1,57 +1,61 @@
-{/*import { useState } from 'react';
-import { View, Text, TextInput, Button, Switch, StyleSheet } from 'react-native';
-import DynamicForm from '../../components/forms/DynamicForm';
+import { useRouter } from 'expo-router';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 
-export default function DynamicForm({ structure, onSubmit }) {
-  const [formData, setFormData] = useState({});
+import { THEME } from '@/styles/theme';
 
-  // Função para atualizar o estado de forma dinâmica
-  const handleChange = (fieldName: string, value: any) => {
-    setFormData(prev => ({ ...prev, [fieldName]: value }));
-  };
+export default function SubmitScreen() {
+  const router = useRouter();
 
   return (
-    <View style={styles.container}>
-      {structure.map((field: any) => (
-        <View key={field.name} style={styles.fieldContainer}>
-          <Text style={styles.label}>{field.label}</Text>
-          */}
-          {/* Renderização Condicional baseada no tipo do campo no JSON */} {/*
-          {field.type === 'text' && (
-            <TextInput
-              style={styles.input}
-              placeholder={field.placeholder}
-              onChangeText={(text) => handleChange(field.name, text)}
-            />
-          )}
+    <SafeAreaView style={styles.container}>
+      <View style={styles.content}>
+        <Text style={styles.title}>Envio de formulário</Text>
+        <Text style={styles.description}>
+          Esta rota está disponível, mas ainda não recebe uma estrutura de formulário própria.
+        </Text>
 
-          {field.type === 'number' && (
-            <TextInput
-              style={styles.input}
-              keyboardType="numeric"
-              onChangeText={(text) => handleChange(field.name, text)}
-            />
-          )}
-
-          {field.type === 'boolean' && (
-            <Switch
-              value={formData[field.name] || false}
-              onValueChange={(val) => handleChange(field.name, val)}
-            />
-          )}
-        </View>
-      ))}
-
-      <Button title="Enviar Coleta" onPress={() => onSubmit(formData)} />
-    </View>
+        <TouchableOpacity style={styles.button} onPress={() => router.back()}>
+          <Text style={styles.buttonText}>Voltar</Text>
+        </TouchableOpacity>
+      </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { padding: 15 },
-  fieldContainer: { marginBottom: 20 },
-  label: { fontSize: 16, fontWeight: '500', marginBottom: 5 },
-  input: { borderBottomWidth: 1, borderColor: '#ccc', padding: 8 }
+  container: {
+    flex: 1,
+    backgroundColor: THEME.colors.background,
+  },
+  content: {
+    flex: 1,
+    paddingHorizontal: 24,
+    justifyContent: 'center',
+  },
+  title: {
+    fontFamily: 'Jakarta-Bold',
+    fontSize: 24,
+    color: THEME.colors.textPrimary,
+    marginBottom: 12,
+  },
+  description: {
+    fontFamily: 'Manrope-Regular',
+    fontSize: 15,
+    lineHeight: 22,
+    color: THEME.colors.textSecondary,
+    marginBottom: 24,
+  },
+  button: {
+    height: 52,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: THEME.colors.primary,
+  },
+  buttonText: {
+    fontFamily: 'Manrope-SemiBold',
+    color: '#FFF',
+    fontSize: 16,
+  },
 });
-
-*/}

@@ -2,7 +2,7 @@ import React, { useState, useCallback } from 'react';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { 
   View, Text, StyleSheet, ScrollView, 
-  TouchableOpacity, RefreshControl 
+  TouchableOpacity, RefreshControl, Alert 
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as NetInfo from '@react-native-community/netinfo';
@@ -20,6 +20,7 @@ export default function Home() {
   const { user } = useAuthStore();
   
   const [projects, setProjects] = useState<Project[]>([]);
+  const [archivedProjects, setArchivedProjects] = useState<Project[]>([]);
   const [publicForms, setPublicForms] = useState<any[]>([]);
   const [refreshing, setRefreshing] = useState(false);
   const [isOffline, setIsOffline] = useState(false);
@@ -40,13 +41,15 @@ export default function Home() {
   const loadData = useCallback(async () => {
     setRefreshing(true);
     try {
-      const [data, publicData] = await Promise.all([
+      const [data, archivedData, publicData] = await Promise.all([
         projectRepo.listActive(),
+        projectRepo.listArchived(),
         formRepo.getPublicForms(),
       ]);
       // Console log para você conferir no terminal o nome exato do campo da cor
       console.log("Projetos carregados:", data); 
       setProjects(data);
+      setArchivedProjects(archivedData);
       
       // Filtra formulários públicos para remover aqueles do próprio usuário (dono)
       const filteredPublicForms = publicData.filter(form => form.ownerId !== user?.id);
@@ -57,6 +60,30 @@ export default function Home() {
       setRefreshing(false);
     }
   }, []);
+
+  const handleRestoreArchivedProject = async (projectId: string) => {
+    try {
+      await projectRepo.restore(projectId);
+      await loadData();
+    } catch (error) {
+      console.error('Erro ao restaurar projeto:', error);
+    }
+  };
+
+  const handleDeleteArchivedProject = async (projectId: string) => {
+    try {
+      await projectRepo.permanentDelete(projectId);
+      setArchivedProjects((current) => current.filter((project) => project.id !== projectId));
+      await loadData();
+      Alert.alert('Sucesso', 'Projeto deletado definitivamente.');
+    } catch (error) {
+      console.error('Erro ao excluir projeto arquivado:', error);
+      const message = error instanceof Error
+        ? error.message
+        : 'Nao foi possivel deletar o projeto. Tente novamente com internet.';
+      Alert.alert('Erro ao deletar', message);
+    }
+  };
 
   useFocusEffect(
     useCallback(() => {
@@ -100,7 +127,9 @@ export default function Home() {
                 const isOwner = item.ownerId === user?.id;
                 const isArchived = (item as any).deletedAt !== null;
                 const statusLabel = isArchived ? 'Arquivado' : (isOwner ? 'Meu Projeto' : 'Colaborador');
-                const statusColor = isOwner ? THEME.colors.primary : '#F59E0B';
+                const statusColor = isArchived ? '#94A3B8' : (isOwner ? THEME.colors.primary : '#F59E0B');
+                const cardCircleColor = isArchived ? '#E2E8F0' : `${projectColor}15`;
+                const iconColor = isArchived ? '#94A3B8' : projectColor;
 
                 return (
                   <TouchableOpacity 
@@ -111,8 +140,8 @@ export default function Home() {
                       params: { id: item.id, name: item.name, color: projectColor } 
                     })}
                   >
-                    <View style={[styles.iconCircle, { backgroundColor: projectColor + '15' }]}>
-                      <Ionicons name={isOwner ? "folder" : "people"} size={28} color={projectColor} />
+                    <View style={[styles.iconCircle, { backgroundColor: cardCircleColor }]}> 
+                      <Ionicons name={isArchived ? "archive" : (isOwner ? "folder" : "people")} size={28} color={iconColor} />
                     </View>
                     <Text style={styles.projectLabel} numberOfLines={1}>{item.name}</Text>
                     <View style={styles.cardFooter}>
@@ -145,6 +174,68 @@ export default function Home() {
             </TouchableOpacity>
           </View>
         </View>
+
+        {archivedProjects.length > 0 ? (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Arquivados</Text>
+
+            {archivedProjects.map((item) => {
+              const projectColor = item.color || (item as any).themeColor || THEME.colors.primary;
+              const isArchived = (item as any).deletedAt !== null;
+
+              return (
+                <View key={item.id} style={styles.archivedCard}>
+                  <TouchableOpacity
+                    style={styles.archivedMain}
+                    onPress={() => router.push({
+                      pathname: '/(project)/[id]',
+                      params: { id: item.id, name: item.name, color: projectColor },
+                    })}
+                  >
+                    <View style={styles.archivedIconCircle}>
+                      <Ionicons name="archive" size={22} color="#94A3B8" />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.archivedTitle} numberOfLines={1}>{item.name}</Text>
+                      <Text style={styles.archivedSubtitle}>Projeto arquivado</Text>
+                    </View>
+                  </TouchableOpacity>
+
+                  <View style={styles.archivedActions}>
+                    <TouchableOpacity
+                      style={styles.restoreBtn}
+                      onPress={() => handleRestoreArchivedProject(item.id)}
+                    >
+                      <Ionicons name="arrow-undo-outline" size={16} color={THEME.colors.primary} />
+                      <Text style={styles.restoreText}>Restaurar</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      style={styles.deleteBtn}
+                      onPress={() =>
+                        Alert.alert(
+                          'Excluir definitivamente?',
+                          'Essa acao nao pode ser desfeita.',
+                          [
+                            { text: 'Cancelar', style: 'cancel' },
+                            {
+                              text: 'Excluir',
+                              style: 'destructive',
+                              onPress: () => handleDeleteArchivedProject(item.id),
+                            },
+                          ]
+                        )
+                      }
+                    >
+                      <Ionicons name="trash-outline" size={16} color="#EF4444" />
+                      <Text style={styles.deleteText}>Deletar</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              );
+            })}
+          </View>
+        ) : null}
 
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Formularios Publicos</Text>
@@ -185,7 +276,6 @@ export default function Home() {
 
       </Container>
 
-      {/* Footer fora do Container para poder ocupar a largura total se necessário, ou dentro se preferir margem */}
       <DeveloperFooter />
       
     </ScrollView>
@@ -228,6 +318,48 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     color: THEME.colors.textPrimary
   },
+  archivedCard: {
+    backgroundColor: THEME.colors.surface,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: THEME.colors.border,
+    padding: 14,
+    marginBottom: 12,
+  },
+  archivedMain: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  archivedIconCircle: {
+    width: 42,
+    height: 42,
+    borderRadius: 12,
+    backgroundColor: '#F1F5F9',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  archivedTitle: { ...THEME.fonts.body, fontFamily: 'Jakarta-Bold', fontSize: 15, color: THEME.colors.textPrimary },
+  archivedSubtitle: { fontSize: 12, color: '#94A3B8', marginTop: 2 },
+  archivedActions: { flexDirection: 'row', gap: 10, marginTop: 12 },
+  restoreBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 10,
+    borderRadius: 12,
+    backgroundColor: '#EEF2FF',
+  },
+  restoreText: { color: THEME.colors.primary, fontFamily: 'Manrope-SemiBold', fontSize: 12 },
+  deleteBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 10,
+    borderRadius: 12,
+    backgroundColor: '#FEE2E2',
+  },
+  deleteText: { color: '#EF4444', fontFamily: 'Manrope-SemiBold', fontSize: 12 },
 
   dot: {
     width: 6,
@@ -393,246 +525,3 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
 });
-
-
-
-
-
-{/*
-
-import React, { useState, useCallback } from 'react';
-import { useRouter, useFocusEffect } from 'expo-router';
-import { 
-  View, Text, StyleSheet, ScrollView, 
-  TouchableOpacity, RefreshControl 
-} from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import * as NetInfo from '@react-native-community/netinfo';
-
-import Container from '@/components/common/Container';
-import { THEME } from '@/styles/theme';
-import DeveloperFooter from '@/components/common/DeveloperFooter';
-import { ProjectRepositoryImpl } from '@/data/projects/repositories/ProjectRepositoryImpl';
-import { useAuthStore } from '@/presentation/auth/store/useAuthStore';
-import { Project } from '@/core/projects/domain/entities/Project';
-
-export default function Home() {
-  const router = useRouter();
-  const { user } = useAuthStore();
-  
-  const [projects, setProjects] = useState<Project[]>([]);
-  const [refreshing, setRefreshing] = useState(false);
-  const [isOffline, setIsOffline] = useState(false);
-
-  const projectRepo = new ProjectRepositoryImpl();
-
-  // Monitor de Conexão
-  useFocusEffect(
-    useCallback(() => {
-      const unsubscribe = NetInfo.addEventListener(state => {
-        setIsOffline(!state.isConnected);
-      });
-      return () => unsubscribe();
-    }, [])
-  );
-
-  const loadData = useCallback(async () => {
-    setRefreshing(true);
-    try {
-      const data = await projectRepo.listActive();
-      // Console log para você conferir no terminal o nome exato do campo da cor
-      console.log("Projetos carregados:", data); 
-      setProjects(data);
-    } catch (error) {
-      console.error("Erro ao carregar projetos:", error);
-    } finally {
-      setRefreshing(false);
-    }
-  }, []);
-
-  useFocusEffect(
-    useCallback(() => {
-      loadData();
-    }, [loadData])
-  );
-
-  return (
-    <View style={styles.mainContainer}>
-      // Banner Offline se isOffline for true 
-      
-      <ScrollView 
-        contentContainerStyle={styles.scrollContent}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={loadData} colors={[THEME.colors.primary]} />}
-      >
-        <Container>
-          <View style={styles.welcomeSection}>
-            <Text style={styles.welcomeText}>Olá, {user?.name?.split(' ')[0] || 'Usuário'}!</Text>
-            <Text style={styles.subtitle}>Gerencie seus formulários e coletas.</Text>
-          </View>
-
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Projetos Ativos</Text>
-            
-            <View style={styles.projectGrid}>
-                {projects.map((item) => {
-                  const projectColor = item.color || (item as any).themeColor || THEME.colors.primary;
-                  
-                  // Lógica de Status (Mesmo que o back ainda não mande, o front já se prepara)
-                  const isArchived = (item as any).deletedAt !== null || (item as any).status === 'archived';
-                  const statusLabel = isArchived ? 'Arquivado' : 'Ativo';
-                  const statusColor = isArchived ? '#94A3B8' : '#10B981'; // Cinza vs Verde Sucesso
-
-                  return (
-                    <TouchableOpacity 
-                      key={item.id} 
-                      style={styles.projectCard} 
-                      onPress={() => router.push({ pathname: "/(project)/[id]", params: { id: item.id } })}
-                    >
-                      <View style={[styles.iconCircle, { backgroundColor: projectColor + '15' }]}>
-                         <Ionicons name="folder" size={28} color={projectColor} />
-                      </View>
-                      
-                      <Text style={styles.projectLabel} numberOfLines={1}>{item.name}</Text>
-                      
-                      <View style={styles.cardFooter}>
-                         <View style={[styles.dot, { backgroundColor: statusColor }]} />
-                         <Text style={[styles.projectSubLabel, { color: statusColor }]}>{statusLabel}</Text>
-                      </View>
-                    </TouchableOpacity>
-                  );
-                })}
-                
-                 // BOTÃO NOVO PROJETO - REESTILIZADO 
-                <TouchableOpacity 
-                  style={styles.newProjectCard} 
-                  onPress={() => router.push('/(project)/new')}
-                >
-                  <View style={styles.newProjectIconContainer}>
-                    <Ionicons name="add" size={32} color={THEME.colors.primary} />
-                  </View>
-                  <Text style={styles.newProjectLabel}>Novo Projeto</Text>
-                </TouchableOpacity>
-            </View>
-          </View>
-        </Container>
-        <DeveloperFooter />
-      </ScrollView>
-    </View>
-  );
-} /*}
-{/*
-const styles = StyleSheet.create({
-  mainContainer: { flex: 1, backgroundColor: THEME.colors.background },
-  scrollContent: { flexGrow: 1, paddingTop: 10 },
-  
-  offlineBanner: { 
-    flexDirection: 'row', 
-    backgroundColor: THEME.colors.error || '#DC2626', 
-    padding: 8, 
-    alignItems: 'center', 
-    justifyContent: 'center',
-    gap: 8
-  },
-  offlineText: { color: '#FFF', fontSize: 12, fontFamily: 'Manrope-SemiBold' },
-
-  welcomeSection: { marginBottom: 25 },
-  welcomeText: { ...THEME.fonts.title, fontSize: 24 },
-  subtitle: { ...THEME.fonts.subtitle, fontSize: 14, color: THEME.colors.textSecondary },
-
-  section: { marginBottom: 30 },
-  sectionTitle: { ...THEME.fonts.title, fontSize: 18, marginBottom: 15 },
-
-  projectGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 14 },
- 
-  projectLabel: { 
-    ...THEME.fonts.body, 
-    fontSize: 15, 
-    fontFamily: 'Jakarta-Bold', 
-    textAlign: 'center',
-    color: THEME.colors.textPrimary
-  },
-
-  dot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-  },
- 
-  newProject: { 
-    borderStyle: 'dashed', 
-    backgroundColor: 'transparent',
-    justifyContent: 'center'
-  },
-  newProjectIcon: {
-    marginBottom: 8
-  },
-  projectCard: {
-    width: '47%', 
-    backgroundColor: THEME.colors.surface,
-    borderRadius: 24, 
-    padding: 20,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: THEME.colors.border,
-    elevation: 3,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-  },
-
- 
-  newProjectCard: {
-    width: '47%',
-    borderRadius: 24,
-    padding: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 2,
-    borderColor: THEME.colors.primary + '30', 
-    borderStyle: 'dashed',
-    backgroundColor: THEME.colors.primary + '05', 
-  },
-  newProjectIconContainer: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    backgroundColor: THEME.colors.primary + '15',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 10
-  },
-  newProjectLabel: {
-    fontFamily: 'Manrope-Bold',
-    fontSize: 14,
-    color: THEME.colors.primary,
-  },
-
-  iconCircle: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 12
-  },
-  
-  cardFooter: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    marginTop: 6,
-    backgroundColor: THEME.colors.inputBg, 
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 12
-  },
-  
-  projectSubLabel: {
-    fontSize: 10,
-    fontFamily: 'Manrope-Bold',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5
-  }
-});
-*/}

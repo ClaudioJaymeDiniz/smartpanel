@@ -1,18 +1,24 @@
 import React, { useState, useEffect } from 'react';
 import { 
   View, Text, ScrollView, StyleSheet, TouchableOpacity, 
-  ActivityIndicator, KeyboardAvoidingView, Platform, Alert, Switch 
+  ActivityIndicator, KeyboardAvoidingView, Platform, Alert, Image 
 } from 'react-native';
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
 
 import { THEME } from '@/styles/theme';
 import Container from '@/components/common/Container';
-import CustomInput from '@/components/common/CustomInput'; // Seu componente animado
+import CustomInput from '@/components/common/CustomInput';
 import { FormRepositoryImpl } from '@/data/forms/repositories/FormRepositoryImpl';
 import { SubmissionRepositoryImpl } from '@/data/forms/repositories/SubmissionRepositoryImpl';
-import { useSubmissions } from '@/presentation/forms/hooks/useSubmissions'; // Hook com UseCase
+import { ProjectRepositoryImpl } from '@/data/projects/repositories/ProjectRepositoryImpl';
+import { useSubmissions } from '@/presentation/forms/hooks/useSubmissions'; 
 import { Form, FormField } from '@/core/forms/domain/entities/Form';
+import {
+  getImagePreviewUri,
+  hasImageValue,
+  isLocalImageValue,
+  pickAndPersistImage,
+} from '@/services/formImage';
 
 export default function AnswerFormScreen() {
   const { id, submissionId } = useLocalSearchParams();
@@ -21,9 +27,11 @@ export default function AnswerFormScreen() {
   const [loading, setLoading] = useState(true);
   const [form, setForm] = useState<Form | null>(null);
   const [responses, setResponses] = useState<Record<string, any>>({});
+  const [isProjectArchived, setIsProjectArchived] = useState(false);
 
   const formRepo = new FormRepositoryImpl();
   const submissionRepo = new SubmissionRepositoryImpl();
+  const projectRepo = new ProjectRepositoryImpl();
   const { submitForm, submitting } = useSubmissions(); // Usando a lógica nova
   const isEditMode = typeof submissionId === 'string' && submissionId.length > 0;
 
@@ -31,15 +39,43 @@ export default function AnswerFormScreen() {
     loadForm();
   }, [id]);
 
+  const isFieldFilled = (field: FormField, value: any) => {
+    if (field.type === 'checkbox') {
+      return Array.isArray(value) && value.length > 0;
+    }
+
+    if (field.type === 'image') {
+      return hasImageValue(value);
+    }
+
+    return value !== null && value !== undefined && String(value).trim().length > 0;
+  };
+
   const loadForm = async () => {
     try {
       const data = await formRepo.getById(id as string);
       setForm(data);
+
+      if (data?.projectId) {
+        try {
+          const projectData = await projectRepo.findById(data.projectId);
+          const archived = Boolean(projectData?.deletedAt);
+          setIsProjectArchived(archived);
+
+          if (archived) {
+            Alert.alert('Projeto arquivado', 'Este projeto nao pode receber novas respostas.');
+            router.replace(`/(form)/${id}`);
+            return;
+          }
+        } catch {
+          // Se nao conseguir validar, mantemos o fluxo e deixamos o backend garantir a regra.
+        }
+      }
       
       // Inicializa o estado das respostas
       const initial: Record<string, any> = {};
       data.structure.forEach((f: FormField) => {
-        initial[f.label] = f.type === 'checkbox' ? [] : '';
+        initial[f.label] = f.type === 'checkbox' ? [] : null;
       });
 
       if (isEditMode) {
@@ -60,8 +96,13 @@ export default function AnswerFormScreen() {
   };
 
   const handleSend = async () => {
+    if (isProjectArchived) {
+      Alert.alert('Projeto arquivado', 'Este projeto nao pode receber respostas.');
+      return;
+    }
+
     // Validação de campos obrigatórios
-    const missing = form?.structure.find(f => f.required && !responses[f.label]);
+    const missing = form?.structure.find((f) => f.required && !isFieldFilled(f, responses[f.label]));
     if (missing) return Alert.alert("Ops!", `O campo "${missing.label}" é obrigatório.`);
 
     try {
@@ -84,7 +125,55 @@ export default function AnswerFormScreen() {
   const renderField = (field: FormField) => {
     const value = responses[field.label];
 
+    const handlePickImage = async () => {
+      try {
+        const image = await pickAndPersistImage();
+        if (!image) return;
+
+        setResponses({
+          ...responses,
+          [field.label]: image,
+        });
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Nao foi possivel selecionar a imagem.';
+        Alert.alert('Erro', message);
+      }
+    };
+
     switch (field.type) {
+      case 'image': {
+        const previewUri = getImagePreviewUri(value);
+
+        return (
+          <View style={styles.imageArea}>
+            <Text style={styles.smallLabel}>{field.label}</Text>
+            <TouchableOpacity style={styles.imageButton} onPress={handlePickImage}>
+              <Text style={styles.imageButtonText}>
+                {previewUri ? 'Trocar imagem' : 'Selecionar imagem'}
+              </Text>
+            </TouchableOpacity>
+
+            {previewUri ? (
+              <View style={styles.imagePreviewCard}>
+                <Image source={{ uri: previewUri }} style={styles.imagePreview} />
+                <Text style={styles.imageHint} numberOfLines={1}>
+                  {isLocalImageValue(value) ? 'Imagem salva localmente no aparelho' : 'Imagem carregada'}
+                </Text>
+              </View>
+            ) : null}
+
+            {previewUri ? (
+              <TouchableOpacity
+                style={styles.imageClearButton}
+                onPress={() => setResponses({ ...responses, [field.label]: null })}
+              >
+                <Text style={styles.imageClearText}>Remover imagem</Text>
+              </TouchableOpacity>
+            ) : null}
+          </View>
+        );
+      }
+
       case 'checkbox':
         return (
           <View style={styles.selectArea}>
@@ -103,7 +192,7 @@ export default function AnswerFormScreen() {
                       } else {
                         arr.push(opt);
                       }
-                      setResponses({...responses, [field.label]: arr});
+                      setResponses({ ...responses, [field.label]: arr });
                     }}
                   >
                     <Text style={[styles.optText, isSelected && styles.optTextActive]}>{opt}</Text>
@@ -123,7 +212,7 @@ export default function AnswerFormScreen() {
                 <TouchableOpacity 
                   key={opt}
                   style={[styles.optBtn, value === opt && styles.optBtnActive]}
-                  onPress={() => setResponses({...responses, [field.label]: opt})}
+                    onPress={() => setResponses({ ...responses, [field.label]: opt })}
                 >
                   <Text style={[styles.optText, value === opt && styles.optTextActive]}>{opt}</Text>
                 </TouchableOpacity>
@@ -137,7 +226,7 @@ export default function AnswerFormScreen() {
           <CustomInput 
             label={field.label}
             value={value?.toString() || ''}
-            onChangeText={(t) => setResponses({...responses, [field.label]: t})}
+            onChangeText={(t) => setResponses({ ...responses, [field.label]: t })}
             keyboardType={field.type === 'number' ? 'numeric' : 'default'}
             multiline={field.type === 'textarea'}
           />
@@ -186,6 +275,51 @@ const styles = StyleSheet.create({
   title: { fontSize: 24, fontFamily: 'Jakarta-Bold', color: THEME.colors.textPrimary },
   desc: { fontSize: 14, color: THEME.colors.textSecondary, marginBottom: 30 },
   formBody: { marginBottom: 40 },
+  imageArea: { marginBottom: 4 },
+  imageButton: {
+    height: 50,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: THEME.colors.primary,
+    borderStyle: 'dashed',
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#FFF',
+  },
+  imageButtonText: { fontFamily: 'Jakarta-Bold', color: THEME.colors.primary, fontSize: 13 },
+  imagePreviewCard: {
+    marginTop: 12,
+    backgroundColor: '#FFF',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: THEME.colors.border,
+    padding: 12,
+  },
+  imagePreview: {
+    width: '100%',
+    height: 220,
+    borderRadius: 12,
+    backgroundColor: '#E5E7EB',
+  },
+  imageHint: {
+    marginTop: 8,
+    color: THEME.colors.textSecondary,
+    fontSize: 12,
+    fontFamily: 'Jakarta-SemiBold',
+  },
+  imageClearButton: {
+    marginTop: 10,
+    alignSelf: 'flex-start',
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 999,
+    backgroundColor: '#FEE2E2',
+  },
+  imageClearText: {
+    color: '#B91C1C',
+    fontFamily: 'Jakarta-Bold',
+    fontSize: 12,
+  },
   cardField: { 
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
     padding: 16, backgroundColor: '#FFF', borderRadius: 16, borderWidth: 1, borderColor: THEME.colors.border 

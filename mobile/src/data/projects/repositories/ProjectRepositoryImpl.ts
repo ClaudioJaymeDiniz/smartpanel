@@ -2,10 +2,53 @@ import { api } from '@/services/api';
 import { IProjectRepository } from '@/core/projects/domain/repositories/IProjectRepository';
 import { Project, ProjectCreate } from '@/core/projects/domain/entities/Project';
 import { ProjectMapper } from '@/core/projects/mappers/ProjectMappers';
+import axios from 'axios';
 
 import * as SQLite from 'expo-sqlite';
 
 const db = SQLite.openDatabaseSync('smartpanel.db');
+
+function dedupeProjects(projects: Project[]): Project[] {
+  const result: Project[] = [];
+  const realNames = new Set<string>();
+  const tempIndexByName = new Map<string, number>();
+
+  for (const project of projects) {
+    const normalizedName = (project.name || '').trim().toLowerCase();
+
+    if (project.id.startsWith('temp-')) {
+      if (normalizedName && realNames.has(normalizedName)) {
+        continue;
+      }
+
+      if (normalizedName && tempIndexByName.has(normalizedName)) {
+        continue;
+      }
+
+      if (normalizedName) {
+        tempIndexByName.set(normalizedName, result.length);
+      }
+
+      result.push(project);
+      continue;
+    }
+
+    if (normalizedName) {
+      realNames.add(normalizedName);
+
+      const tempIndex = tempIndexByName.get(normalizedName);
+      if (typeof tempIndex === 'number') {
+        result[tempIndex] = project;
+        tempIndexByName.delete(normalizedName);
+        continue;
+      }
+    }
+
+    result.push(project);
+  }
+
+  return result;
+}
 
 export class ProjectRepositoryImpl implements IProjectRepository {
   
@@ -17,6 +60,7 @@ export class ProjectRepositoryImpl implements IProjectRepository {
 
       // Sincroniza o cache local
       try {
+        db.runSync("DELETE FROM projects_cache WHERE id LIKE 'temp-%'");
         db.runSync('DELETE FROM projects_cache');
         for (const p of projects) {
           db.runSync(
@@ -29,13 +73,13 @@ export class ProjectRepositoryImpl implements IProjectRepository {
         // Continua mesmo se o cache falhar
       }
       
-      return ProjectMapper.toDomainList(projects);
+      return ProjectMapper.toDomainList(dedupeProjects(projects));
     } catch (error) {
       // Fallback para o SQLite
       try {
         const cache: any[] = db.getAllSync('SELECT data FROM projects_cache');
         if (cache.length > 0) {
-          return ProjectMapper.toDomainList(cache.map(c => JSON.parse(c.data)));
+          return ProjectMapper.toDomainList(dedupeProjects(cache.map(c => JSON.parse(c.data))));
         }
       } catch (cacheError) {
         console.warn("Erro ao buscar cache local:", cacheError);
@@ -75,15 +119,46 @@ export class ProjectRepositoryImpl implements IProjectRepository {
   async create(data: ProjectCreate): Promise<Project> {
     try {
       const response = await api.post('/projects/', data);
+      try {
+        const created = response.data;
+        db.runSync(
+          'INSERT OR REPLACE INTO projects_cache (id, name, data) VALUES (?, ?, ?)',
+          [created.id, created.name, JSON.stringify(created)]
+        );
+      } catch (cacheError) {
+        console.warn('Erro ao atualizar cache local de projeto:', cacheError);
+      }
       return ProjectMapper.toDomain(response.data);
     } catch (error) {
+      const tempId = `temp-${Date.now()}`;
+
       // Salva na fila de sincronismo
+      const queuedPayload = { ...data, _localTempId: tempId };
       db.runSync(
         'INSERT INTO sync_queue (endpoint, payload, method, status) VALUES (?, ?, ?, ?)',
-        ['/projects/', JSON.stringify(data), 'POST', 'pending']
+        ['/projects/', JSON.stringify(queuedPayload), 'POST', 'pending']
       );
+
+      // Mantem no cache local para aparecer normalmente no offline.
+      const localProject = {
+        id: tempId,
+        ...data,
+        ownerId: 'local',
+        isPublic: false,
+        deletedAt: null,
+      };
+
+      try {
+        db.runSync(
+          'INSERT OR REPLACE INTO projects_cache (id, name, data) VALUES (?, ?, ?)',
+          [tempId, data.name, JSON.stringify(localProject)]
+        );
+      } catch (cacheError) {
+        console.warn('Erro ao salvar projeto offline no cache:', cacheError);
+      }
+
       return { 
-        id: `temp-${Date.now()}`, 
+        id: tempId,
         ...data, 
         ownerId: 'local', 
         isPublic: false, 
@@ -133,17 +208,32 @@ export class ProjectRepositoryImpl implements IProjectRepository {
     }
   }
 
+  // 6. ARQUIVAR
+  async archive(id: string): Promise<void> {
+    try {
+      await api.delete(`/projects/${id}`);
+      db.runSync('DELETE FROM projects_cache WHERE id = ?', [id]);
+    } catch (error) {
+      db.runSync(
+        'INSERT INTO sync_queue (endpoint, payload, method, status) VALUES (?, ?, ?, ?)',
+        [`/projects/${id}`, JSON.stringify({}), 'DELETE', 'pending']
+      );
+      db.runSync('DELETE FROM projects_cache WHERE id = ?', [id]);
+    }
+  }
+
   // 7. DELETAR PERMANENTE
   async permanentDelete(id: string): Promise<void> {
     try {
       await api.delete(`/projects/${id}/permanent`);
       db.runSync('DELETE FROM projects_cache WHERE id = ?', [id]);
     } catch (error) {
-      db.runSync(
-        'INSERT INTO sync_queue (endpoint, payload, method, status) VALUES (?, ?, ?, ?)',
-        [`/projects/${id}/permanent`, JSON.stringify({}), 'DELETE', 'pending']
-      );
-      db.runSync('DELETE FROM projects_cache WHERE id = ?', [id]);
+      if (axios.isAxiosError(error)) {
+        const detail = (error.response?.data as any)?.detail;
+        throw new Error(detail || 'Exclusao definitiva requer conexao e projeto arquivado.');
+      }
+
+      throw new Error('Exclusao definitiva requer conexao e projeto arquivado.');
     }
   }
   // 8. BUSCAR POR ID (COMPLETO: API + FALLBACK CACHE)

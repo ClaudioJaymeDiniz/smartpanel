@@ -12,6 +12,7 @@ interface Props {
 }
 
 export const ProjectTeamList = ({ owner, members, projectColor, onInvitePress, isOwner }: Props) => {
+  const filteredMembers = (members || []).filter((m) => m?.user?.id !== owner?.id);
   return (
     <View style={styles.container}>
       <View style={styles.header}>
@@ -37,8 +38,8 @@ export const ProjectTeamList = ({ owner, members, projectColor, onInvitePress, i
       </View>
 
       {/* Outros Membros: Só visíveis para o Dono */}
-      {isOwner && members?.map((item) => (
-        <View key={item.userId} style={[styles.memberCard, { marginTop: 12 }]}>
+      {isOwner && filteredMembers?.map((item) => (
+        <View key={item.userId} style={[styles.memberCard, { marginTop: 12 }] }>
           <View style={styles.avatar}>
             <Text style={styles.avatarText}>{item.user?.name?.[0]?.toUpperCase()}</Text>
           </View>
@@ -50,8 +51,8 @@ export const ProjectTeamList = ({ owner, members, projectColor, onInvitePress, i
       ))}
 
       {/* Feedback visual para colaborador */}
-      {!isOwner && members?.length > 0 && (
-        <Text style={styles.infoText}>+ {members.length} colaboradores participando</Text>
+      {!isOwner && filteredMembers?.length > 0 && (
+        <Text style={styles.infoText}>+ {filteredMembers.length} colaboradores participando</Text>
       )}
     </View>
   );

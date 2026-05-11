@@ -12,6 +12,7 @@ export class FormMapper {
       structure: Array.isArray(raw.structure) ? raw.structure : [],
       createdAt: new Date(raw.createdAt),
       deletedAt: raw.deletedAt ? new Date(raw.deletedAt) : null,
+      submissionCount: typeof raw.submissionCount === 'number' ? raw.submissionCount : 0,
     };
   }
 

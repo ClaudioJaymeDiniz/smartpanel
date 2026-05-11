@@ -4,6 +4,7 @@ import * as SQLite from 'expo-sqlite';
 import NetInfo from '@react-native-community/netinfo';
 import { useRouter, useSegments } from 'expo-router';
 import { api } from '../services/api';
+import { SubmissionRepositoryImpl } from '@/data/forms/repositories/SubmissionRepositoryImpl';
 
 interface AuthContextData {
   signed: boolean;
@@ -18,6 +19,7 @@ interface AuthContextData {
 const AuthContext = createContext<AuthContextData>({} as AuthContextData);
 
 const db = SQLite.openDatabaseSync('smartpanel.db');
+const submissionRepository = new SubmissionRepositoryImpl();
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<any>(null);
@@ -99,7 +101,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       console.log(`[SmartPanel] Sincronizando ${queue.length} itens...`);
       for (const item of queue) {
-        await api.post(item.endpoint, JSON.parse(item.payload));
+        const payload = JSON.parse(item.payload);
+
+        if (item.endpoint?.startsWith('/submissions') && item.method === 'POST') {
+          await submissionRepository.send(payload);
+        } else if (item.endpoint?.startsWith('/submissions') && item.method === 'PATCH') {
+          const submissionId = payload.id || item.endpoint.split('/').filter(Boolean).pop();
+          await submissionRepository.update(submissionId, payload.formData ?? payload);
+        } else {
+          await api.post(item.endpoint, payload);
+        }
         db.runSync('DELETE FROM sync_queue WHERE id = ?', [item.id]);
       }
     } catch (err) {

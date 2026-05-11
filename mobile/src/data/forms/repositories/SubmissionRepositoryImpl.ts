@@ -3,36 +3,62 @@ import axios from 'axios';
 import { ISubmissionRepository } from '@/core/forms/domain/repositories/ISubmissionRepository';
 import { Submission, SubmissionCreate } from '@/core/forms/domain/entities/Submission';
 import { SubmissionMapper } from '@/core/forms/mappers/SubmissionMapper';
+import { normalizeSubmissionFormData } from '@/services/formImage';
 import * as SQLite from 'expo-sqlite';
 
 const db = SQLite.openDatabaseSync('smartpanel.db');
+
+async function queueSubmission(endpoint: string, payload: any, method: 'POST' | 'PATCH') {
+  db.runSync(
+    'INSERT INTO sync_queue (endpoint, payload, method, status) VALUES (?, ?, ?, ?)',
+    [endpoint, JSON.stringify(payload), method, 'pending']
+  );
+}
+
+function createLocalSubmission(data: SubmissionCreate): Submission {
+  return {
+    id: data.id,
+    formData: data.formData,
+    formId: data.formId,
+    userId: 'local-user',
+    createdAt: new Date(),
+  } as Submission;
+}
 
 export class SubmissionRepositoryImpl implements ISubmissionRepository {
   
   // 1. ENVIAR RESPOSTA (O coração do Sync Offline)
   async send(data: SubmissionCreate): Promise<Submission> {
+    let normalizedData = data;
+
+    try {
+      normalizedData = {
+        ...data,
+        formData: await normalizeSubmissionFormData(data.formData),
+      };
+    } catch (uploadError) {
+      if (axios.isAxiosError(uploadError) && !uploadError.response) {
+        await queueSubmission('/submissions/', data, 'POST');
+        console.log(`Submissao ${data.id} salva localmente para sincronizacao futura.`);
+        return createLocalSubmission(data);
+      }
+
+      throw uploadError;
+    }
+
     try {
       // Tenta enviar para o FastAPI no Linux Mint
-      const response = await api.post('/submissions/', data);
+      const response = await api.post('/submissions/', normalizedData);
       return SubmissionMapper.toDomain(response.data);
     } catch (error) {
       // Só trata como offline quando não há resposta HTTP.
       // Em caso de 4xx/5xx do backend, propagamos erro para a UI.
       if (axios.isAxiosError(error) && !error.response) {
-        db.runSync(
-          'INSERT INTO sync_queue (endpoint, payload, method, status) VALUES (?, ?, ?, ?)',
-          ['/submissions/', JSON.stringify(data), 'POST', 'pending']
-        );
+        await queueSubmission('/submissions/', normalizedData, 'POST');
 
         console.log(`Submissao ${data.id} salva localmente para sincronizacao futura.`);
 
-        return {
-          id: data.id,
-          formData: data.formData,
-          formId: data.formId,
-          userId: 'local-user',
-          createdAt: new Date(),
-        } as Submission;
+        return createLocalSubmission(normalizedData);
       }
 
       if (axios.isAxiosError(error)) {
@@ -69,20 +95,37 @@ export class SubmissionRepositoryImpl implements ISubmissionRepository {
 
   // 4. ATUALIZAR RESPOSTA (Correção de dados)
   async update(id: string, formData: Record<string, any>): Promise<Submission> {
-    const payload = { formData };
+    let normalizedFormData = formData;
+
+    try {
+      normalizedFormData = await normalizeSubmissionFormData(formData);
+    } catch (uploadError) {
+      if (axios.isAxiosError(uploadError) && !uploadError.response) {
+        await queueSubmission(`/submissions/${id}`, { formData }, 'PATCH');
+
+        return {
+          id,
+          formData,
+          userId: 'local-user',
+          formId: 'unknown',
+          createdAt: new Date(),
+        } as Submission;
+      }
+
+      throw uploadError;
+    }
+
+    const payload = { formData: normalizedFormData };
     try {
       const response = await api.patch(`/submissions/${id}`, payload);
       return SubmissionMapper.toDomain(response.data);
     } catch (error) {
       if (axios.isAxiosError(error) && !error.response) {
-        db.runSync(
-          'INSERT INTO sync_queue (endpoint, payload, method, status) VALUES (?, ?, ?, ?)',
-          [`/submissions/${id}`, JSON.stringify(payload), 'PATCH', 'pending']
-        );
+        await queueSubmission(`/submissions/${id}`, payload, 'PATCH');
 
         return {
           id,
-          formData,
+          formData: normalizedFormData,
           userId: 'local-user',
           formId: 'unknown',
           createdAt: new Date(),
