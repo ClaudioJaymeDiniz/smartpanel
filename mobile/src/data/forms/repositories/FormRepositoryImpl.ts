@@ -2,6 +2,9 @@ import { api } from '@/services/api';
 import { IFormRepository } from '@/core/forms/domain/repositories/IFormRepository';
 import { Form, FormCreate } from '@/core/forms/domain/entities/Form';
 import { FormMapper } from '@/core/forms/mappers/FormMapper';
+import * as FileSystem from 'expo-file-system/legacy';
+import * as SecureStore from 'expo-secure-store';
+import axios from 'axios';
 import * as SQLite from 'expo-sqlite';
 
 const db = SQLite.openDatabaseSync('smartpanel.db');
@@ -163,7 +166,18 @@ export class FormRepositoryImpl implements IFormRepository {
   async update(id: string, data: Partial<FormCreate>): Promise<Form> {
     try {
       const response = await api.patch(`/forms/${id}`, data);
-      return FormMapper.toDomain(response.data);
+      const updated = response.data;
+
+      try {
+        db.runSync(
+          'INSERT OR REPLACE INTO forms_cache (id, projectId, data) VALUES (?, ?, ?)',
+          [updated.id, updated.projectId, JSON.stringify(updated)]
+        );
+      } catch (cacheError) {
+        console.warn('Erro ao atualizar cache do formulario:', cacheError);
+      }
+
+      return FormMapper.toDomain(updated);
     } catch (error) {
       db.runSync(
         'INSERT INTO sync_queue (endpoint, payload, method, status) VALUES (?, ?, ?, ?)',
@@ -188,5 +202,132 @@ export class FormRepositoryImpl implements IFormRepository {
   // 6. URL DE EXPORTAÇÃO
   getExportUrl(id: string): string {
     return `${api.defaults.baseURL}/forms/${id}/export/csv`;
+  }
+
+  async downloadResponsesCsv(id: string): Promise<string> {
+    const token = await SecureStore.getItemAsync('user_token');
+    const url = this.getExportUrl(id);
+    const baseDirectory = FileSystem.documentDirectory ?? FileSystem.cacheDirectory;
+
+    if (!baseDirectory) {
+      throw new Error('Nao foi possivel definir um diretorio local para o CSV.');
+    }
+
+    const destination = `${baseDirectory}respostas_form_${id.slice(0, 8)}.csv`;
+
+    try {
+      const result = await FileSystem.downloadAsync(url, destination, {
+        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+      });
+
+      return result.uri;
+    } catch (error) {
+      if (axios.isAxiosError(error)) {
+        const detail = (error.response?.data as any)?.detail;
+        throw new Error(detail || 'Falha ao baixar o CSV.');
+      }
+
+      throw new Error('Falha ao baixar o CSV.');
+    }
+  }
+
+  async archive(id: string): Promise<void> {
+    try {
+      const response = await api.delete(`/forms/${id}`);
+      const archived = response.data;
+
+      try {
+        db.runSync(
+          'INSERT OR REPLACE INTO forms_cache (id, projectId, data) VALUES (?, ?, ?)',
+          [archived.id, archived.projectId, JSON.stringify(archived)]
+        );
+      } catch (cacheError) {
+        console.warn('Erro ao atualizar cache do formulario arquivado:', cacheError);
+      }
+    } catch (error) {
+      if (axios.isAxiosError(error) && !error.response) {
+        db.runSync(
+          'INSERT INTO sync_queue (endpoint, payload, method, status) VALUES (?, ?, ?, ?)',
+          [`/forms/${id}`, JSON.stringify({}), 'DELETE', 'pending']
+        );
+
+        try {
+          const current: any = db.getFirstSync('SELECT data FROM forms_cache WHERE id = ?', [id]);
+          if (current?.data) {
+            const cached = JSON.parse(current.data);
+            cached.deletedAt = new Date().toISOString();
+            db.runSync('UPDATE forms_cache SET data = ? WHERE id = ?', [JSON.stringify(cached), id]);
+          }
+        } catch (cacheError) {
+          console.warn('Erro ao arquivar formulario no cache local:', cacheError);
+        }
+
+        return;
+      }
+
+      if (axios.isAxiosError(error)) {
+        const detail = (error.response?.data as any)?.detail;
+        throw new Error(detail || 'Falha ao arquivar o formulario.');
+      }
+
+      throw new Error('Falha ao arquivar o formulario.');
+    }
+  }
+
+  async restore(id: string): Promise<void> {
+    try {
+      const response = await api.post(`/forms/${id}/restore`);
+      const restored = response.data;
+
+      try {
+        db.runSync(
+          'INSERT OR REPLACE INTO forms_cache (id, projectId, data) VALUES (?, ?, ?)',
+          [restored.id, restored.projectId, JSON.stringify(restored)]
+        );
+      } catch (cacheError) {
+        console.warn('Erro ao atualizar cache do formulario restaurado:', cacheError);
+      }
+    } catch (error) {
+      if (axios.isAxiosError(error) && !error.response) {
+        db.runSync(
+          'INSERT INTO sync_queue (endpoint, payload, method, status) VALUES (?, ?, ?, ?)',
+          [`/forms/${id}/restore`, JSON.stringify({}), 'POST', 'pending']
+        );
+
+        try {
+          const current: any = db.getFirstSync('SELECT data FROM forms_cache WHERE id = ?', [id]);
+          if (current?.data) {
+            const cached = JSON.parse(current.data);
+            cached.deletedAt = null;
+            db.runSync('UPDATE forms_cache SET data = ? WHERE id = ?', [JSON.stringify(cached), id]);
+          }
+        } catch (cacheError) {
+          console.warn('Erro ao restaurar formulario no cache local:', cacheError);
+        }
+
+        return;
+      }
+
+      if (axios.isAxiosError(error)) {
+        const detail = (error.response?.data as any)?.detail;
+        throw new Error(detail || 'Falha ao restaurar o formulario.');
+      }
+
+      throw new Error('Falha ao restaurar o formulario.');
+    }
+  }
+
+  async permanentDelete(id: string): Promise<void> {
+    try {
+      await api.delete(`/forms/${id}/permanent`);
+      db.runSync('DELETE FROM forms_cache WHERE id = ?', [id]);
+    } catch (error) {
+      if (axios.isAxiosError(error)) {
+        const detail = (error.response?.data as any)?.detail;
+        throw new Error(detail || 'Exclusao definitiva requer conexao e formulario arquivado.');
+      }
+
+      throw new Error('Exclusao definitiva requer conexao e formulario arquivado.');
+    }
   }
 }

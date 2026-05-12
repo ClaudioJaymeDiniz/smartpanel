@@ -19,11 +19,13 @@ import { THEME } from '@/styles/theme';
 import Container from '@/components/common/Container';
 import { useAuthStore } from '@/presentation/auth/store/useAuthStore';
 import { useFormDetails } from '@/presentation/forms/hooks/useFormDetails';
+import { FormRepositoryImpl } from '@/data/forms/repositories/FormRepositoryImpl';
 
 export default function FormDetails() {
   const { id } = useLocalSearchParams();
   const router = useRouter();
   const { user } = useAuthStore();
+  const formRepo = new FormRepositoryImpl();
 
   const {
     form,
@@ -32,10 +34,16 @@ export default function FormDetails() {
     refreshing,
     isOwner,
     isProjectArchived,
+    isFormArchived,
+    projectColor,
     mySubmission,
     setRefreshing,
     loadData,
   } = useFormDetails(id as string, user?.id);
+
+  const accentColor = projectColor || THEME.colors.primary;
+  const accentSoft = `${accentColor}10`;
+  const accentBorder = `${accentColor}45`;
 
   useFocusEffect(
     useCallback(() => {
@@ -47,6 +55,11 @@ export default function FormDetails() {
   );
 
   const openAnswerScreen = () => {
+    if (isFormArchived) {
+      Alert.alert('Formulario arquivado', 'Este formulario foi arquivado e nao aceita novas respostas.');
+      return;
+    }
+
     if (isProjectArchived) {
       Alert.alert('Projeto arquivado', 'Este projeto esta arquivado e nao pode receber respostas.');
       return;
@@ -61,6 +74,11 @@ export default function FormDetails() {
   const openEditMySubmission = () => {
     if (!mySubmission) return;
 
+    if (isFormArchived) {
+      Alert.alert('Formulario arquivado', 'Este formulario foi arquivado e nao pode ser editado.');
+      return;
+    }
+
     if (isProjectArchived) {
       Alert.alert('Projeto arquivado', 'Este projeto esta arquivado e nao pode receber respostas.');
       return;
@@ -73,6 +91,11 @@ export default function FormDetails() {
   };
 
   const openEditSubmission = (submissionId: string) => {
+    if (isFormArchived) {
+      Alert.alert('Formulario arquivado', 'Este formulario foi arquivado e nao pode ser editado.');
+      return;
+    }
+
     if (isProjectArchived) {
       Alert.alert('Projeto arquivado', 'Este projeto esta arquivado e nao pode receber respostas.');
       return;
@@ -89,6 +112,75 @@ export default function FormDetails() {
       pathname: '/(form)/edit',
       params: { id: id as string },
     });
+  };
+
+  const handleExportCsv = async () => {
+    try {
+      const fileUri = await formRepo.downloadResponsesCsv(id as string);
+      Alert.alert('CSV baixado', `Arquivo salvo em:\n${fileUri}`);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Nao foi possivel baixar o CSV.';
+      Alert.alert('Erro ao exportar', message);
+    }
+  };
+
+  const handleArchiveForm = () => {
+    Alert.alert(
+      'Arquivar formulário?',
+      'O formulário vai para a lixeira e só poderá ser excluído definitivamente depois disso.',
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Arquivar',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await formRepo.archive(id as string);
+              await loadData();
+              Alert.alert('Sucesso', 'Formulario arquivado com sucesso.');
+            } catch (error) {
+              const message = error instanceof Error ? error.message : 'Nao foi possivel arquivar o formulario.';
+              Alert.alert('Erro', message);
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const handleRestoreForm = async () => {
+    try {
+      await formRepo.restore(id as string);
+      await loadData();
+      Alert.alert('Sucesso', 'Formulario restaurado com sucesso.');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Nao foi possivel restaurar o formulario.';
+      Alert.alert('Erro', message);
+    }
+  };
+
+  const handlePermanentDelete = () => {
+    Alert.alert(
+      'Excluir definitivamente?',
+      'Essa acao nao pode ser desfeita.',
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Excluir',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await formRepo.permanentDelete(id as string);
+              Alert.alert('Sucesso', 'Formulario excluido definitivamente.');
+              router.back();
+            } catch (error) {
+              const message = error instanceof Error ? error.message : 'Nao foi possivel excluir o formulario.';
+              Alert.alert('Erro', message);
+            }
+          },
+        },
+      ]
+    );
   };
 
   const goBack = () => {
@@ -166,7 +258,12 @@ export default function FormDetails() {
 
   return (
     <View style={styles.screen}>
-      <Stack.Screen options={{ title: form?.title || 'Respostas do Formulario' }} />
+      <Stack.Screen
+        options={{
+          title: form?.title || 'Respostas do Formulario',
+          headerTintColor: accentColor,
+        }}
+      />
 
       <ScrollView
         contentContainerStyle={styles.scroll}
@@ -183,27 +280,58 @@ export default function FormDetails() {
       >
         <Container>
           <TouchableOpacity style={styles.backButton} onPress={goBack} accessibilityLabel="Voltar página">
-            <Ionicons name="arrow-back" size={22} color={THEME.colors.primary} />
+            <Ionicons name="arrow-back" size={22} color={accentColor} />
           </TouchableOpacity>
 
           <Text style={styles.title}>{form?.title}</Text>
           <Text style={styles.description}>{form?.description || 'Visualize as respostas enviadas.'}</Text>
 
+          {isOwner && isFormArchived ? (
+            <View style={[styles.archivedBanner, { backgroundColor: accentSoft, borderColor: accentBorder }]}>
+              <Ionicons name="archive-outline" size={18} color="#64748B" />
+              <Text style={styles.archivedBannerText}>Formulario arquivado</Text>
+            </View>
+          ) : null}
+
           <View style={styles.actionsRow}>
             {isOwner ? (
-              <TouchableOpacity style={styles.secondaryButton} onPress={openEditForm}>
-                <Ionicons name="build-outline" size={16} color={THEME.colors.primary} />
-                <Text style={styles.secondaryButtonText}>Editar formulario</Text>
-              </TouchableOpacity>
+              <View style={styles.ownerActions}>
+                {!isFormArchived ? (
+                  <>
+                    <TouchableOpacity style={[styles.secondaryButton, { backgroundColor: accentSoft, borderColor: accentBorder }]} onPress={openEditForm}>
+                      <Ionicons name="build-outline" size={16} color={accentColor} />
+                      <Text style={[styles.secondaryButtonText, { color: accentColor }]}>Editar formulario</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity style={[styles.secondaryButton, { backgroundColor: accentSoft, borderColor: accentBorder }]} onPress={handleExportCsv}>
+                      <Ionicons name="download-outline" size={16} color={accentColor} />
+                      <Text style={[styles.secondaryButtonText, { color: accentColor }]}>Baixar CSV</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity style={[styles.secondaryButton, { backgroundColor: accentSoft, borderColor: accentBorder }]} onPress={handleArchiveForm}>
+                      <Ionicons name="archive-outline" size={16} color={accentColor} />
+                      <Text style={[styles.secondaryButtonText, { color: accentColor }]}>Arquivar formulario</Text>
+                    </TouchableOpacity>
+                  </>
+                ) : (
+                  <>
+                    <TouchableOpacity style={[styles.secondaryButton, { backgroundColor: accentSoft, borderColor: accentBorder }]} onPress={handleRestoreForm}>
+                      <Ionicons name="arrow-undo-outline" size={16} color={accentColor} />
+                      <Text style={[styles.secondaryButtonText, { color: accentColor }]}>Restaurar formulario</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity style={styles.dangerButton} onPress={handlePermanentDelete}>
+                      <Ionicons name="trash-outline" size={16} color="#EF4444" />
+                      <Text style={styles.dangerButtonText}>Excluir definitivamente</Text>
+                    </TouchableOpacity>
+                  </>
+                )}
+              </View>
             ) : (
-              <TouchableOpacity
-                style={[styles.primaryButton, isProjectArchived && styles.disabledButton]}
-                onPress={openAnswerScreen}
-                disabled={isProjectArchived}
-              >
+              <TouchableOpacity style={[styles.primaryButton, (isProjectArchived || isFormArchived) && styles.disabledButton]} onPress={openAnswerScreen} disabled={isProjectArchived || isFormArchived}>
                 <Ionicons name="paper-plane-outline" size={16} color="#FFF" />
                 <Text style={styles.primaryButtonText}>
-                  {isProjectArchived ? 'Projeto arquivado' : 'Responder formulario'}
+                  {isFormArchived ? 'Formulario arquivado' : isProjectArchived ? 'Projeto arquivado' : 'Responder formulario'}
                 </Text>
               </TouchableOpacity>
             )}
@@ -295,6 +423,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   actionsRow: { marginBottom: 16 },
+  ownerActions: { gap: 10 },
   primaryButton: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -320,6 +449,31 @@ const styles = StyleSheet.create({
     borderRadius: 14,
   },
   secondaryButtonText: { color: THEME.colors.primary, fontFamily: 'Jakarta-Bold', fontSize: 14 },
+  dangerButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: '#FEF2F2',
+    borderColor: '#FECACA',
+    borderWidth: 1,
+    height: 48,
+    borderRadius: 14,
+  },
+  dangerButtonText: { color: '#DC2626', fontFamily: 'Jakarta-Bold', fontSize: 14 },
+  archivedBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    backgroundColor: '#F8FAFC',
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    marginBottom: 14,
+  },
+  archivedBannerText: { color: '#475569', fontFamily: 'Jakarta-SemiBold', fontSize: 13 },
   sectionTitle: { marginTop: 6, marginBottom: 10, fontSize: 16, fontFamily: 'Jakarta-Bold', color: THEME.colors.textPrimary },
   emptyState: {
     marginTop: 10,

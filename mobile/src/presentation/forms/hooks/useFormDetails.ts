@@ -17,6 +17,8 @@ export function useFormDetails(formId: string, userId?: string) {
   const [refreshing, setRefreshing] = useState(false);
   const [isOwner, setIsOwner] = useState(false);
   const [isProjectArchived, setIsProjectArchived] = useState(false);
+  const [isFormArchived, setIsFormArchived] = useState(false);
+  const [projectColor, setProjectColor] = useState<string | null>(null);
 
   const loadData = useCallback(async () => {
     if (!refreshing) setLoading(true);
@@ -29,14 +31,17 @@ export function useFormDetails(formId: string, userId?: string) {
 
       setForm(formData);
       setSubmissions(responseData);
+      setIsFormArchived(Boolean(formData?.deletedAt));
 
       if (userId && formData?.projectId) {
         const projectData = await projectRepo.findById(formData.projectId);
         setIsOwner(projectData?.ownerId === userId);
         setIsProjectArchived(Boolean(projectData?.deletedAt));
+        setProjectColor(projectData?.color || projectData?.themeColor || null);
       } else {
         setIsOwner(false);
         setIsProjectArchived(false);
+        setProjectColor(null);
       }
     } finally {
       setLoading(false);
@@ -53,6 +58,8 @@ export function useFormDetails(formId: string, userId?: string) {
     refreshing,
     isOwner,
     isProjectArchived,
+    isFormArchived,
+    projectColor,
     mySubmission,
     setRefreshing,
     loadData,
