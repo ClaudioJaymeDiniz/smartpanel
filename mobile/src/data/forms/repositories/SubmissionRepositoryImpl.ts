@@ -88,8 +88,31 @@ export class SubmissionRepositoryImpl implements ISubmissionRepository {
       const response = await api.get(`/submissions/form/${formId}`);
       return SubmissionMapper.toDomainList(response.data);
     } catch (error) {
-      console.warn("Offline: Não é possível listar respostas de terceiros sem conexão.");
-      return [];
+      if (axios.isAxiosError(error) && !error.response) {
+        console.warn("Offline: Não é possível listar respostas de terceiros sem conexão.");
+        return [];
+      }
+
+      if (axios.isAxiosError(error)) {
+        const detail = (error.response?.data as any)?.detail;
+        throw new Error(detail || 'Falha ao listar respostas do formulário.');
+      }
+
+      throw error;
+    }
+  }
+
+  async listAllByForm(formId: string): Promise<Submission[]> {
+    try {
+      const response = await api.get(`/submissions/form/${formId}/all`);
+      return SubmissionMapper.toDomainList(response.data);
+    } catch (error) {
+      if (axios.isAxiosError(error)) {
+        const detail = (error.response?.data as any)?.detail;
+        throw new Error(detail || 'Falha ao carregar todas as respostas do formulário.');
+      }
+
+      throw error;
     }
   }
 

@@ -11,7 +11,6 @@ import Container from '@/components/common/Container';
 import { THEME } from '@/styles/theme';
 import DeveloperFooter from '@/components/common/DeveloperFooter';
 import { ProjectRepositoryImpl } from '@/data/projects/repositories/ProjectRepositoryImpl';
-import { FormRepositoryImpl } from '@/data/forms/repositories/FormRepositoryImpl';
 import { useAuthStore } from '@/presentation/auth/store/useAuthStore';
 import { Project } from '@/core/projects/domain/entities/Project';
 
@@ -21,12 +20,10 @@ export default function Home() {
   
   const [projects, setProjects] = useState<Project[]>([]);
   const [archivedProjects, setArchivedProjects] = useState<Project[]>([]);
-  const [publicForms, setPublicForms] = useState<any[]>([]);
   const [refreshing, setRefreshing] = useState(false);
   const [isOffline, setIsOffline] = useState(false);
 
   const projectRepo = new ProjectRepositoryImpl();
-  const formRepo = new FormRepositoryImpl();
 
   // Monitor de Conexão
   useFocusEffect(
@@ -41,19 +38,12 @@ export default function Home() {
   const loadData = useCallback(async () => {
     setRefreshing(true);
     try {
-      const [data, archivedData, publicData] = await Promise.all([
+      const [data, archivedData] = await Promise.all([
         projectRepo.listActive(),
         projectRepo.listArchived(),
-        formRepo.getPublicForms(),
       ]);
-      // Console log para você conferir no terminal o nome exato do campo da cor
-      console.log("Projetos carregados:", data); 
       setProjects(data);
       setArchivedProjects(archivedData);
-      
-      // Filtra formulários públicos para remover aqueles do próprio usuário (dono)
-      const filteredPublicForms = publicData.filter(form => form.ownerId !== user?.id);
-      setPublicForms(filteredPublicForms);
     } catch (error) {
       console.error("Erro ao carregar projetos:", error);
     } finally {
@@ -112,9 +102,16 @@ export default function Home() {
             Olá, {user?.name?.split(' ')[0] || 'Usuário'}!
           </Text>
           <Text style={styles.subtitle}>
-            Gerencie seus formulários e coletas.
+            Acompanhe seus projetos e crie novos espaços de trabalho.
           </Text>
         </View>
+
+        {isOffline ? (
+          <View style={styles.offlineBanner}>
+            <Ionicons name="cloud-offline-outline" size={18} color="#FFF" />
+            <Text style={styles.offlineText}>Modo offline ativo. Os dados serão sincronizados depois.</Text>
+          </View>
+        ) : null}
 
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Projetos Ativos</Text>
@@ -157,21 +154,10 @@ export default function Home() {
                 <View style={styles.emptyStateContainer}>
                   <Ionicons name="folder-open-outline" size={50} color={THEME.colors.border} />
                   <Text style={styles.emptyTitle}>Nenhum projeto encontrado</Text>
-                  <Text style={styles.emptySubtitle}>Você ainda não criou ou foi convidado para um projeto.</Text>
+                  <Text style={styles.emptySubtitle}>Crie seu primeiro projeto para começar a organizar formulários e membros.</Text>
                 </View>
               )
             )}
-
-            {/* 3. BOTÃO NOVO PROJETO */}
-            <TouchableOpacity 
-              style={styles.newProjectCard} 
-              onPress={() => router.push('/(project)/new')}
-            >
-              <View style={styles.newProjectIconContainer}>
-                <Ionicons name="add" size={32} color={THEME.colors.primary} />
-              </View>
-              <Text style={styles.newProjectLabel}>Novo Projeto</Text>
-            </TouchableOpacity>
           </View>
         </View>
 
@@ -237,48 +223,15 @@ export default function Home() {
           </View>
         ) : null}
 
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Formularios Publicos</Text>
-
-          {publicForms.length === 0 ? (
-            <View style={styles.publicEmptyState}>
-              <Ionicons name="globe-outline" size={34} color={THEME.colors.border} />
-              <Text style={styles.publicEmptyTitle}>Nenhum formulario publico no momento</Text>
-              <Text style={styles.publicEmptySubtitle}>Quando um projeto publicar formularios, eles aparecerao aqui.</Text>
-            </View>
-          ) : (
-            publicForms.map((form) => {
-              const accent = form.projectColor || THEME.colors.primary;
-              return (
-                <TouchableOpacity
-                  key={form.id}
-                  style={styles.publicCard}
-                  onPress={() => router.push({ pathname: '/(form)/[id]', params: { id: form.id } })}
-                >
-                  <View style={[styles.publicIconCircle, { backgroundColor: `${accent}15` }]}> 
-                    <Ionicons name="document-text-outline" size={20} color={accent} />
-                  </View>
-
-                  <View style={styles.publicContent}>
-                    <Text style={styles.publicTitle} numberOfLines={1}>{form.title}</Text>
-                    <Text style={styles.publicMeta} numberOfLines={1}>Projeto: {form.projectName}</Text>
-                    {form.description ? (
-                      <Text style={styles.publicDescription} numberOfLines={2}>{form.description}</Text>
-                    ) : null}
-                  </View>
-
-                  <Ionicons name="chevron-forward" size={18} color={THEME.colors.border} />
-                </TouchableOpacity>
-              );
-            })
-          )}
-        </View>
-
       </Container>
 
       <DeveloperFooter />
       
     </ScrollView>
+
+    <TouchableOpacity style={styles.fab} onPress={() => router.push('/(project)/new')}>
+      <Ionicons name="add" size={26} color="#FFF" />
+    </TouchableOpacity>
   </View>
 );
 }
@@ -367,14 +320,6 @@ const styles = StyleSheet.create({
     borderRadius: 3,
   },
  
-  newProject: { 
-    borderStyle: 'dashed', 
-    backgroundColor: 'transparent',
-    justifyContent: 'center'
-  },
-  newProjectIcon: {
-    marginBottom: 8
-  },
   projectCard: {
     width: '47%', 
     backgroundColor: THEME.colors.surface,
@@ -391,32 +336,6 @@ const styles = StyleSheet.create({
   },
 
  
-  newProjectCard: {
-    width: '47%',
-    borderRadius: 24,
-    padding: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 2,
-    borderColor: THEME.colors.primary + '30', 
-    borderStyle: 'dashed',
-    backgroundColor: THEME.colors.primary + '05', 
-  },
-  newProjectIconContainer: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    backgroundColor: THEME.colors.primary + '15',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 10
-  },
-  newProjectLabel: {
-    fontFamily: 'Manrope-Bold',
-    fontSize: 14,
-    color: THEME.colors.primary,
-  },
-
   iconCircle: {
     width: 60,
     height: 60,
@@ -469,59 +388,20 @@ const styles = StyleSheet.create({
     paddingHorizontal: 30,
     marginTop: 5
   },
-  publicCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: THEME.colors.surface,
-    borderRadius: 18,
-    borderWidth: 1,
-    borderColor: THEME.colors.border,
-    padding: 14,
-    marginBottom: 10,
-  },
-  publicIconCircle: {
-    width: 44,
-    height: 44,
-    borderRadius: 12,
-    alignItems: 'center',
+  fab: {
+    position: 'absolute',
+    right: 18,
+    bottom: 22,
+    width: 58,
+    height: 58,
+    borderRadius: 29,
+    backgroundColor: THEME.colors.primary,
     justifyContent: 'center',
-    marginRight: 12,
-  },
-  publicContent: { flex: 1 },
-  publicTitle: {
-    color: THEME.colors.textPrimary,
-    fontFamily: 'Jakarta-Bold',
-    fontSize: 15,
-  },
-  publicMeta: {
-    color: THEME.colors.textSecondary,
-    fontSize: 12,
-    marginTop: 2,
-  },
-  publicDescription: {
-    color: THEME.colors.textSecondary,
-    fontSize: 12,
-    marginTop: 6,
-  },
-  publicEmptyState: {
     alignItems: 'center',
-    justifyContent: 'center',
-    padding: 18,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: THEME.colors.border,
-    backgroundColor: THEME.colors.surface,
-  },
-  publicEmptyTitle: {
-    marginTop: 8,
-    fontFamily: 'Jakarta-Bold',
-    color: THEME.colors.textPrimary,
-    fontSize: 14,
-  },
-  publicEmptySubtitle: {
-    marginTop: 4,
-    color: THEME.colors.textSecondary,
-    fontSize: 12,
-    textAlign: 'center',
+    elevation: 6,
+    shadowColor: '#000',
+    shadowOpacity: 0.18,
+    shadowOffset: { width: 0, height: 4 },
+    shadowRadius: 10,
   },
 });

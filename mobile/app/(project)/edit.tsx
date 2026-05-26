@@ -1,6 +1,6 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useState } from 'react';
 import { View, Text, StyleSheet, TextInput, TouchableOpacity, ActivityIndicator, ScrollView } from 'react-native';
-import { useRouter, useLocalSearchParams, Stack } from 'expo-router';
+import { useNavigation, useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
 import { THEME } from '@/styles/theme';
@@ -13,6 +13,7 @@ const PRESET_COLORS = ['#3B82F6','#F59E0B', '#EF4444', '#8B5CF6', '#99ccff', '#0
 
 export default function EditProject() {
   const router = useRouter();
+  const navigation = useNavigation();
   const { id } = useLocalSearchParams();
   const { alertConfig, showAlert, hideAlert } = useAlert();
   const projectRepo = new ProjectRepositoryImpl();
@@ -43,6 +44,13 @@ export default function EditProject() {
     };
     loadProject();
   }, [id]);
+
+  useLayoutEffect(() => {
+    navigation.setOptions({
+      title: 'Editar Projeto',
+      headerTintColor: themeColor,
+    });
+  }, [navigation, themeColor]);
 
   const handleUpdate = async () => {
     if (!name.trim()) return showAlert("Atenção", "O nome não pode estar vazio.");
@@ -98,7 +106,6 @@ export default function EditProject() {
 
   return (
     <View style={styles.mainContainer}>
-      <Stack.Screen options={{ title: 'Editar Projeto', headerTintColor: themeColor }} />
       <SmartAlert {...alertConfig} onCancel={hideAlert} />
 
       <ScrollView>

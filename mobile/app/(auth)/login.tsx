@@ -118,7 +118,6 @@ export default function LoginScreen() {
           </TouchableOpacity>
         </View>
 
-          {/* Link para Cadastro */}
           <TouchableOpacity 
             onPress={() => router.push('/(auth)/register')}
             style={styles.footerLink}
@@ -130,7 +129,6 @@ export default function LoginScreen() {
 
         </View>
         
-        {/* Seu Rodapé reutilizável */}
         <DeveloperFooter />
       </ScrollView>
     </SafeAreaView>

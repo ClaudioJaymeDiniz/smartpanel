@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useLayoutEffect, useState } from 'react';
 import { View, Text, StyleSheet, TextInput, TouchableOpacity, ScrollView, ActivityIndicator } from 'react-native';
-import { useRouter, Stack } from 'expo-router';
+import { useNavigation, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
 import { THEME } from '@/styles/theme';
@@ -14,6 +14,7 @@ const PRESET_COLORS = ['#3B82F6','#F59E0B', '#EF4444', '#8B5CF6', '#99ccff', '#0
 
 export default function NewProject() {
   const router = useRouter();
+  const navigation = useNavigation();
   const { alertConfig, showAlert, hideAlert } = useAlert();
   const projectRepo = new ProjectRepositoryImpl();
 
@@ -21,6 +22,12 @@ export default function NewProject() {
   const [description, setDescription] = useState('');
   const [themeColor, setThemeColor] = useState('#3B82F6');
   const [loading, setLoading] = useState(false);
+
+  useLayoutEffect(() => {
+    navigation.setOptions({
+      title: 'Novo Projeto',
+    });
+  }, [navigation]);
 
   const handleCreate = async () => {
     if (!name.trim()) {
@@ -47,7 +54,6 @@ export default function NewProject() {
 
   return (
     <View style={styles.mainContainer}>
-      <Stack.Screen options={{ title: 'Novo Projeto' }} />
       <SmartAlert {...alertConfig} onCancel={hideAlert} />
 
       <ScrollView contentContainerStyle={{ paddingBottom: 40 }}>

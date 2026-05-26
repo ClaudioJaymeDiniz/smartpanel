@@ -12,42 +12,48 @@ export default function TabLayout() {
         tabBarStyle: {
           backgroundColor: THEME.colors.surface,
           borderTopColor: THEME.colors.border,
-          height: 60,
-          paddingBottom: 8,
+          borderTopWidth: 1,
+          height: 68,
+          paddingBottom: 10,
+          paddingTop: 8,
+          elevation: 8,
+          shadowColor: '#000',
+          shadowOpacity: 0.06,
+          shadowOffset: { width: 0, height: -2 },
+          shadowRadius: 12,
         },
         tabBarLabelStyle: {
           fontFamily: 'Manrope-SemiBold',
           fontSize: 12,
-        }
+        },
       }}
     >
       <Tabs.Screen
         name="index"
         options={{
-          title: 'Início',
+          title: 'Projetos',
           tabBarIcon: ({ color, focused }) => (
-            <Ionicons name={focused ? "home" : "home-outline"} size={24} color={color} />
+            <Ionicons name={focused ? 'folder' : 'folder-outline'} size={24} color={color} />
           ),
         }}
       />
-      
-      {/* Sugestão: Uma aba dedicada apenas para a lista de projetos
-      <Tabs.Screen
-        name="projects" 
-        options={{
-          title: 'Projetos',
-          tabBarIcon: ({ color, focused }) => (
-            <Ionicons name={focused ? "folder-open" : "folder-outline"} size={24} color={color} />
-          ),
-        }}
-      /> */}
 
       <Tabs.Screen
-        name="settings"
+        name="explore"
         options={{
-          title: 'Configurações',
+          title: 'Explorar',
           tabBarIcon: ({ color, focused }) => (
-            <Ionicons name={focused ? "settings" : "settings-outline"} size={24} color={color} />
+            <Ionicons name={focused ? 'search' : 'search-outline'} size={24} color={color} />
+          ),
+        }}
+      />
+
+      <Tabs.Screen
+        name="profile"
+        options={{
+          title: 'Perfil',
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons name={focused ? 'person' : 'person-outline'} size={24} color={color} />
           ),
         }}
       />

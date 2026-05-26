@@ -24,24 +24,27 @@ export function useFormDetails(formId: string, userId?: string) {
     if (!refreshing) setLoading(true);
 
     try {
-      const [formData, responseData] = await Promise.all([
-        formRepo.getById(formId),
-        submissionRepo.listByForm(formId),
-      ]);
-
+      const formData = await formRepo.getById(formId);
       setForm(formData);
-      setSubmissions(responseData);
       setIsFormArchived(Boolean(formData?.deletedAt));
 
       if (userId && formData?.projectId) {
         const projectData = await projectRepo.findById(formData.projectId);
-        setIsOwner(projectData?.ownerId === userId);
+        const ownerAccess = projectData?.ownerId === userId;
+        setIsOwner(ownerAccess);
         setIsProjectArchived(Boolean(projectData?.deletedAt));
         setProjectColor(projectData?.color || projectData?.themeColor || null);
+
+        const responseData = ownerAccess
+          ? await submissionRepo.listAllByForm(formId)
+          : await submissionRepo.listByForm(formId);
+
+        setSubmissions(responseData);
       } else {
         setIsOwner(false);
         setIsProjectArchived(false);
         setProjectColor(null);
+        setSubmissions(await submissionRepo.listByForm(formId));
       }
     } finally {
       setLoading(false);

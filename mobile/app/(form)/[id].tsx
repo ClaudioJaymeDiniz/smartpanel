@@ -44,6 +44,8 @@ export default function FormDetails() {
   const accentColor = projectColor || THEME.colors.primary;
   const accentSoft = `${accentColor}10`;
   const accentBorder = `${accentColor}45`;
+  const totalSubmissionCount = form?.submissionCount ?? submissions.length;
+  const visibleSubmissionCount = submissions.length;
 
   useFocusEffect(
     useCallback(() => {
@@ -286,6 +288,24 @@ export default function FormDetails() {
           <Text style={styles.title}>{form?.title}</Text>
           <Text style={styles.description}>{form?.description || 'Visualize as respostas enviadas.'}</Text>
 
+          <View style={styles.summaryRow}>
+            <View style={styles.summaryCard}>
+              <Text style={styles.summaryValue}>{totalSubmissionCount}</Text>
+              <Text style={styles.summaryLabel}>Total de respostas</Text>
+            </View>
+            <View style={styles.summaryCard}>
+              <Text style={styles.summaryValue}>{visibleSubmissionCount}</Text>
+              <Text style={styles.summaryLabel}>Visíveis para você</Text>
+            </View>
+          </View>
+
+          {!isOwner ? (
+            <View style={[styles.restrictedBanner, { backgroundColor: accentSoft, borderColor: accentBorder }]}>
+              <Ionicons name="lock-closed-outline" size={18} color={accentColor} />
+              <Text style={[styles.restrictedBannerText, { color: accentColor }]}>Você vê apenas suas respostas. O total do formulário continua disponível acima.</Text>
+            </View>
+          ) : null}
+
           {isOwner && isFormArchived ? (
             <View style={[styles.archivedBanner, { backgroundColor: accentSoft, borderColor: accentBorder }]}>
               <Ionicons name="archive-outline" size={18} color="#64748B" />
@@ -301,6 +321,11 @@ export default function FormDetails() {
                     <TouchableOpacity style={[styles.secondaryButton, { backgroundColor: accentSoft, borderColor: accentBorder }]} onPress={openEditForm}>
                       <Ionicons name="build-outline" size={16} color={accentColor} />
                       <Text style={[styles.secondaryButtonText, { color: accentColor }]}>Editar formulario</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity style={[styles.secondaryButton, { backgroundColor: accentSoft, borderColor: accentBorder }]} onPress={() => router.push({ pathname: '/(dashboard)/[formularioId]/analitics', params: { formularioId: id } })}>
+                      <Ionicons name="analytics-outline" size={16} color={accentColor} />
+                      <Text style={[styles.secondaryButtonText, { color: accentColor }]}>Analytics</Text>
                     </TouchableOpacity>
 
                     <TouchableOpacity style={[styles.secondaryButton, { backgroundColor: accentSoft, borderColor: accentBorder }]} onPress={handleExportCsv}>
@@ -337,13 +362,19 @@ export default function FormDetails() {
             )}
           </View>
 
-          <Text style={styles.sectionTitle}>Respostas ({submissions.length})</Text>
+          <Text style={styles.sectionTitle}>Respostas visíveis ({visibleSubmissionCount})</Text>
 
           {orderedSubmissions.length === 0 ? (
             <View style={styles.emptyState}>
               <Ionicons name="document-text-outline" size={42} color={THEME.colors.border} />
-              <Text style={styles.emptyTitle}>Nenhuma resposta ainda</Text>
-              <Text style={styles.emptySubtitle}>As respostas enviadas aparecerao aqui.</Text>
+              <Text style={styles.emptyTitle}>
+                {isOwner ? 'Nenhuma resposta ainda' : 'Nenhuma resposta visível para você'}
+              </Text>
+              <Text style={styles.emptySubtitle}>
+                {isOwner
+                  ? 'As respostas enviadas aparecerão aqui.'
+                  : 'O backend filtra as respostas por permissão. Se você esperava ver o conteúdo completo, abra o formulário como proprietário do projeto.'}
+              </Text>
             </View>
           ) : (
             orderedSubmissions.map((submission) => {
@@ -413,6 +444,28 @@ const styles = StyleSheet.create({
   scroll: { paddingVertical: 20 },
   title: { fontSize: 24, fontFamily: 'Jakarta-Bold', color: THEME.colors.textPrimary },
   description: { marginTop: 6, marginBottom: 18, color: THEME.colors.textSecondary, fontSize: 14 },
+  summaryRow: { flexDirection: 'row', gap: 10, marginBottom: 14 },
+  summaryCard: {
+    flex: 1,
+    padding: 14,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: THEME.colors.border,
+    backgroundColor: THEME.colors.surface,
+  },
+  summaryValue: { fontFamily: 'Jakarta-Bold', fontSize: 22, color: THEME.colors.textPrimary },
+  summaryLabel: { marginTop: 2, fontFamily: 'Manrope-Regular', fontSize: 12, color: THEME.colors.textSecondary },
+  restrictedBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    borderRadius: 14,
+    borderWidth: 1,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    marginBottom: 14,
+  },
+  restrictedBannerText: { flex: 1, fontFamily: 'Manrope-SemiBold', fontSize: 12 },
   backButton: {
     alignItems: 'center',
     justifyContent: 'center',

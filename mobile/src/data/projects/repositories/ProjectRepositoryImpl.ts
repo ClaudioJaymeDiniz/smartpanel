@@ -8,6 +8,10 @@ import * as SQLite from 'expo-sqlite';
 
 const db = SQLite.openDatabaseSync('smartpanel.db');
 
+function shouldUseOfflineFallback(error: unknown): boolean {
+  return axios.isAxiosError(error) && (!error.response || error.code === 'ECONNABORTED');
+}
+
 function dedupeProjects(projects: Project[]): Project[] {
   const result: Project[] = [];
   const realNames = new Set<string>();
@@ -75,6 +79,15 @@ export class ProjectRepositoryImpl implements IProjectRepository {
       
       return ProjectMapper.toDomainList(dedupeProjects(projects));
     } catch (error) {
+      if (!shouldUseOfflineFallback(error)) {
+        if (axios.isAxiosError(error)) {
+          const detail = (error.response?.data as any)?.detail;
+          throw new Error(detail || 'Falha ao carregar projetos.');
+        }
+
+        throw error;
+      }
+
       // Fallback para o SQLite
       try {
         const cache: any[] = db.getAllSync('SELECT data FROM projects_cache');
@@ -105,6 +118,15 @@ export class ProjectRepositoryImpl implements IProjectRepository {
       const response = await api.get(`/projects/${id}`);
       return ProjectMapper.toDomain(response.data);
     } catch (error) {
+      if (!shouldUseOfflineFallback(error)) {
+        if (axios.isAxiosError(error)) {
+          const detail = (error.response?.data as any)?.detail;
+          throw new Error(detail || 'Falha ao carregar detalhes do projeto.');
+        }
+
+        throw error;
+      }
+
       try {
         const result: any = db.getFirstSync('SELECT data FROM projects_cache WHERE id = ?', [id]);
         if (result) return ProjectMapper.toDomain(JSON.parse(result.data));
@@ -250,6 +272,15 @@ export class ProjectRepositoryImpl implements IProjectRepository {
 
       return project;
     } catch (error) {
+      if (!shouldUseOfflineFallback(error)) {
+        if (axios.isAxiosError(error)) {
+          const detail = (error.response?.data as any)?.detail;
+          throw new Error(detail || 'Falha ao carregar detalhes do projeto.');
+        }
+
+        throw error;
+      }
+
       console.warn("Offline: buscando detalhes do projeto no cache local.");
       
       // Tenta recuperar do SQLite caso a API falhe (sem internet no Linux Mint)

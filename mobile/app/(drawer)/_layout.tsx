@@ -56,6 +56,22 @@ function CustomDrawerContent(props: any) {
           icon={({ color }) => <Ionicons name="grid-outline" size={22} color={color} />}
           onPress={() => router.push('/(drawer)/(tabs)')}
         />
+        <DrawerItem
+          label="Explorar"
+          focused={props.state.routeNames[props.state.index] === 'explore'}
+          labelStyle={{ fontFamily: 'Manrope-SemiBold' }}
+          activeTintColor={THEME.colors.primary}
+          icon={({ color }) => <Ionicons name="search-outline" size={22} color={color} />}
+          onPress={() => router.push('/(drawer)/(tabs)/explore')}
+        />
+        <DrawerItem
+          label="Perfil"
+          focused={props.state.routeNames[props.state.index] === 'profile'}
+          labelStyle={{ fontFamily: 'Manrope-SemiBold' }}
+          activeTintColor={THEME.colors.primary}
+          icon={({ color }) => <Ionicons name="person-outline" size={22} color={color} />}
+          onPress={() => router.push('/(drawer)/(tabs)/profile')}
+        />
       </View>
 
       <View style={styles.footer}>

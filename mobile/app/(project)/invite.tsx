@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useLayoutEffect } from 'react';
 import { View, Text, StyleSheet, TextInput, TouchableOpacity, ActivityIndicator, ScrollView, FlatList, Keyboard } from 'react-native';
-import { useRouter, useLocalSearchParams, Stack } from 'expo-router';
+import { useNavigation, useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
 import { THEME } from '@/styles/theme';
@@ -11,6 +11,7 @@ import { api } from '@/services/api';
 
 export default function InviteMember() {
   const router = useRouter();
+  const navigation = useNavigation();
   const { id, name, color } = useLocalSearchParams();
   const { alertConfig, showAlert, hideAlert } = useAlert();
 
@@ -24,6 +25,13 @@ export default function InviteMember() {
   const [isSearching, setIsSearching] = useState(false);
 
   const projectColor = (color as string) || THEME.colors.primary;
+
+  useLayoutEffect(() => {
+    navigation.setOptions({
+      title: 'Membros',
+      headerTintColor: projectColor,
+    });
+  }, [navigation, projectColor]);
 
   // 1. Lógica de Busca Dinâmica com Debounce
   useEffect(() => {
@@ -96,7 +104,6 @@ export default function InviteMember() {
 
   return (
     <View style={styles.mainContainer}>
-      <Stack.Screen options={{ title: 'Membros', headerTintColor: projectColor }} />
       <SmartAlert {...alertConfig} onCancel={hideAlert} />
 
       <ScrollView stickyHeaderIndices={[1]} keyboardShouldPersistTaps="handled">

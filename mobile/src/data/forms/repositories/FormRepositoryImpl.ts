@@ -6,8 +6,14 @@ import * as FileSystem from 'expo-file-system/legacy';
 import * as SecureStore from 'expo-secure-store';
 import axios from 'axios';
 import * as SQLite from 'expo-sqlite';
+import { getFormAnalytics } from '@/services/analyticsService';
+import { FormAnalytics } from '@/types/analytics';
 
 const db = SQLite.openDatabaseSync('smartpanel.db');
+
+function shouldUseOfflineFallback(error: unknown): boolean {
+  return axios.isAxiosError(error) && (!error.response || error.code === 'ECONNABORTED');
+}
 
 export class FormRepositoryImpl implements IFormRepository {
 
@@ -98,6 +104,15 @@ export class FormRepositoryImpl implements IFormRepository {
             
       return FormMapper.toDomainList(forms);
     } catch (error) {
+      if (!shouldUseOfflineFallback(error)) {
+        if (axios.isAxiosError(error)) {
+          const detail = (error.response?.data as any)?.detail;
+          throw new Error(detail || 'Falha ao carregar formulários do projeto.');
+        }
+
+        throw error;
+      }
+
       console.warn("Offline: buscando formulários no cache local.");
       
       // Fallback: Busca na tabela específica de formulários
@@ -147,6 +162,15 @@ export class FormRepositoryImpl implements IFormRepository {
 
     return FormMapper.toDomain(formData);
   } catch (error) {
+    if (!shouldUseOfflineFallback(error)) {
+      if (axios.isAxiosError(error)) {
+        const detail = (error.response?.data as any)?.detail;
+        throw new Error(detail || 'Falha ao carregar detalhes do formulário.');
+      }
+
+      throw error;
+    }
+
     // SE FALHAR A API, BUSCA NO CACHE
     try {
       const result: any = db.getFirstSync('SELECT data FROM forms_cache WHERE id = ?', [id]);
@@ -190,13 +214,8 @@ export class FormRepositoryImpl implements IFormRepository {
   }
 
   // 5. ANALYTICS (Geralmente requer conexão)
-  async getAnalytics(id: string): Promise<any> {
-    try {
-      const response = await api.get(`/forms/${id}/analytics`);
-      return response.data;
-    } catch (error) {
-      return { total: 0, daily: [], message: "Dados indisponíveis offline" };
-    }
+  async getAnalytics(id: string): Promise<FormAnalytics> {
+    return getFormAnalytics(id);
   }
 
   // 6. URL DE EXPORTAÇÃO
