@@ -53,14 +53,12 @@ export default function ProjectDetails() {
   if (!refreshing) setLoading(true);
   try {
     const projectRepo = new ProjectRepositoryImpl();
-    const formRepo = new FormRepositoryImpl(); // Instancia o repositório
+    const formRepo = new FormRepositoryImpl();
 
-    // 1. Busca os dados do projeto (Dono e Membros) via Repo
     const projectData = await projectRepo.findById(id as string);
     setProject(projectData);
     setSelectedProject(projectData);
     
-    // 2. Busca os formulários via Repo (Ele já resolve se é Online ou Cache SQL)
     const formsData = await formRepo.getByProject(id as string);
     setForms(formsData);
 
@@ -94,7 +92,9 @@ export default function ProjectDetails() {
         }
       >
         <Container>
+          
           <View style={styles.heroCard}>
+            {/* Icone e Botão configurações (apenas para o dono)
             <View style={styles.heroTopRow}>
               <View style={[styles.heroBadge, { backgroundColor: `${projectColor}18` }]}>
                 <Ionicons name="layers-outline" size={22} color={projectColor} />
@@ -107,6 +107,9 @@ export default function ProjectDetails() {
                 <RNText style={[styles.settingsChipText, { color: projectColor }]}>Configurações</RNText>
               </TouchableOpacity>
             </View>
+            */}
+
+            
 
             <RNText style={styles.projectTitle}>{project?.name || (initialName as string) || 'Projeto'}</RNText>
             <RNText style={styles.projectDescription} numberOfLines={3}>
@@ -127,7 +130,13 @@ export default function ProjectDetails() {
 
           <View style={styles.segmentedControl}>
             <TouchableOpacity
-              style={[styles.segmentButton, activeSection === 'forms' && styles.segmentButtonActive]}
+              style={[
+                styles.segmentButton,
+                activeSection === 'forms' && {
+                  backgroundColor: projectColor,
+                  borderColor: projectColor,
+                },
+              ]}
               onPress={() => setActiveSection('forms')}
             >
               <Ionicons
@@ -135,11 +144,19 @@ export default function ProjectDetails() {
                 size={16}
                 color={activeSection === 'forms' ? '#FFF' : THEME.colors.textSecondary}
               />
-              <RNText style={[styles.segmentText, activeSection === 'forms' && styles.segmentTextActive]}>Formulários</RNText>
+              <RNText style={
+                [styles.segmentText, activeSection === 'forms' && styles.segmentTextActive]}>
+                  Formulários</RNText>
             </TouchableOpacity>
 
             <TouchableOpacity
-              style={[styles.segmentButton, activeSection === 'members' && styles.segmentButtonActive]}
+              style={[
+                styles.segmentButton,
+                activeSection === 'members' && {
+                  backgroundColor: projectColor,
+                  borderColor: projectColor,
+                },
+              ]}
               onPress={() => setActiveSection('members')}
             >
               <Ionicons
@@ -201,7 +218,7 @@ export default function ProjectDetails() {
               ) : null}
             </>
           )}
-</Container>
+        </Container>
       </ScrollView>
     </View>
   );

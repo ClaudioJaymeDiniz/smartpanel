@@ -17,13 +17,6 @@ export const ProjectTeamList = ({ owner, members, projectColor, onInvitePress, i
     <View style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.title}>Equipe</Text>
-        
-        {/* SÓ MOSTRA CONVIDAR SE FOR DONO */}
-        {isOwner && (
-          <TouchableOpacity onPress={onInvitePress}>
-            <Text style={{ color: projectColor, fontFamily: 'Manrope-Bold' }}>Convidar</Text>
-          </TouchableOpacity>
-        )}
       </View>
 
       {/* Dono: Sempre visível para todos */}
