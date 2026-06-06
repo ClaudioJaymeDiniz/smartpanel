@@ -6,7 +6,7 @@ export const api = axios.create({
   //baseURL: 'http://10.128.50.214:8001', //cel
   //baseURL: 'http://192.168.15.10:8001', //casa
   //baseURL: 'http://34.235.114.120:8001', //aws
-  baseURL: 'http://192.168.0.182:8001', //casa nova
+  baseURL: 'https://turkey-antitrust-unsent.ngrok-free.dev', 
 });
 
 api.interceptors.request.use(

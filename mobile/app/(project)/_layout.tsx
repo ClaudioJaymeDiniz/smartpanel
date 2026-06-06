@@ -2,7 +2,7 @@ import { Stack, useLocalSearchParams } from 'expo-router';
 import { COLORS } from '@/styles/colors';
 
 export default function ProjectLayout() {
-  const { id, name } = useLocalSearchParams();
+  const { name } = useLocalSearchParams();
 
   return (
     <Stack

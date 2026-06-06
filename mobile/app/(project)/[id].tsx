@@ -90,6 +90,7 @@ export default function ProjectDetails() {
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); loadProjectData(); }} colors={[projectColor]} />
         }
+        
       >
         <Container>
           
@@ -178,7 +179,7 @@ export default function ProjectDetails() {
                 onFormPress={(formId) => {
                   router.push(`/(form)/${formId}`);
                 }} 
-                onNewFormPress={isOwner ? () => router.push(`/(form)/new?projectId=${id}&color=${encodeURIComponent(projectColor)}`) : undefined}
+                onNewFormPress={isOwner ? () => router.push(`/(form)/new?projectId=${id as string}&color=${encodeURIComponent(projectColor)}`) : undefined}
               />
 
               {isOwner ? (
