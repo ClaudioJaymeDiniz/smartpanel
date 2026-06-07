@@ -68,45 +68,161 @@ function escapeHtml(value: string): string {
     .replace(/'/g, '&#039;');
 }
 
-function buildPdfHtml(analytics: FormAnalytics): string {
-  const dailyRows = analytics.dailySubmissions
+function truncatePdfLabel(value: string, maxLength = 14): string {
+  return value.length > maxLength ? `${value.slice(0, maxLength - 1)}...` : value;
+}
+
+function buildPdfBarChartSvg(data: ChartDataItem[]): string {
+  const chartData = data.filter((item) => item.value > 0).slice(0, 12);
+  if (chartData.length === 0) return '<p class="empty">Sem dados para exibir.</p>';
+
+  const width = 640;
+  const height = 250;
+  const top = 28;
+  const bottom = 48;
+  const side = 30;
+  const gap = 12;
+  const maxValue = Math.max(...chartData.map((item) => item.value), 1);
+  const barWidth = Math.max(
+    (width - side * 2 - gap * (chartData.length - 1)) / chartData.length,
+    22
+  );
+  const chartHeight = height - top - bottom;
+
+  const bars = chartData
+    .map((item, index) => {
+      const barHeight = (item.value / maxValue) * chartHeight;
+      const x = side + index * (barWidth + gap);
+      const y = top + chartHeight - barHeight;
+      const color = CHART_COLORS[index % CHART_COLORS.length];
+
+      return `
+        <rect x="${x}" y="${y}" width="${barWidth}" height="${barHeight}" rx="6" fill="${color}" />
+        <text x="${x + barWidth / 2}" y="${y - 8}" text-anchor="middle" font-size="11" fill="#475569">${item.value}</text>
+        <text x="${x + barWidth / 2}" y="${height - 18}" text-anchor="middle" font-size="10" fill="#64748B">${escapeHtml(
+          truncatePdfLabel(item.label, 10)
+        )}</text>`;
+    })
+    .join('');
+
+  return `
+    <svg class="pdf-chart" viewBox="0 0 ${width} ${height}" role="img">
+      <line x1="${side}" y1="${top + chartHeight}" x2="${width - side}" y2="${top + chartHeight}" stroke="#CBD5E1" />
+      ${bars}
+    </svg>`;
+}
+
+function buildPdfLineChartSvg(data: ChartDataItem[]): string {
+  const chartData = data.filter((item) => item.value > 0).slice(0, 14);
+  if (chartData.length === 0) return '<p class="empty">Sem dados para exibir.</p>';
+
+  const width = 640;
+  const height = 250;
+  const left = 34;
+  const right = 24;
+  const top = 30;
+  const bottom = 48;
+  const chartHeight = height - top - bottom;
+  const maxValue = Math.max(...chartData.map((item) => item.value), 1);
+
+  const points = chartData.map((item, index) => {
+    const availableWidth = width - left - right;
+    const x =
+      chartData.length === 1 ? width / 2 : left + (availableWidth / (chartData.length - 1)) * index;
+    const y = top + chartHeight - (item.value / maxValue) * chartHeight;
+    return { ...item, x, y };
+  });
+
+  const pointMarkup = points
     .map(
-      (item) => `
-        <tr>
-          <td>${escapeHtml(formatDateLabel(item.date))}</td>
-          <td>${item.count}</td>
-        </tr>`
+      (point) => `
+        <circle cx="${point.x}" cy="${point.y}" r="5" fill="${ACCENT}" />
+        <text x="${point.x}" y="${point.y - 10}" text-anchor="middle" font-size="11" fill="#475569">${point.value}</text>
+        <text x="${point.x}" y="${height - 18}" text-anchor="middle" font-size="10" fill="#64748B">${escapeHtml(
+          truncatePdfLabel(point.label, 10)
+        )}</text>`
     )
     .join('');
 
+  return `
+    <svg class="pdf-chart" viewBox="0 0 ${width} ${height}" role="img">
+      <line x1="${left}" y1="${top}" x2="${left}" y2="${top + chartHeight}" stroke="#CBD5E1" />
+      <line x1="${left}" y1="${top + chartHeight}" x2="${width - right}" y2="${top + chartHeight}" stroke="#CBD5E1" />
+      <polyline points="${points.map((point) => `${point.x},${point.y}`).join(' ')}" fill="none" stroke="${ACCENT}" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" />
+      ${pointMarkup}
+    </svg>`;
+}
+
+function buildPdfPieChartSvg(data: ChartDataItem[]): string {
+  const chartData = data.filter((item) => item.value > 0).slice(0, 8);
+  const total = chartData.reduce((sum, item) => sum + item.value, 0);
+  if (chartData.length === 0 || total === 0) return '<p class="empty">Sem dados para exibir.</p>';
+
+  const radius = 72;
+  const circumference = 2 * Math.PI * radius;
+  let offset = 0;
+
+  const slices = chartData
+    .map((item, index) => {
+      const ratio = item.value / total;
+      const dashLength = ratio * circumference;
+      const dashOffset = -offset;
+      offset += dashLength;
+
+      return `<circle cx="110" cy="110" r="${radius}" fill="none" stroke="${CHART_COLORS[index % CHART_COLORS.length]}" stroke-width="36" stroke-dasharray="${dashLength} ${circumference - dashLength}" stroke-dashoffset="${dashOffset}" />`;
+    })
+    .join('');
+
+  const legend = chartData
+    .map((item, index) => {
+      const y = 48 + index * 24;
+      const ratio = item.value / total;
+
+      return `
+        <rect x="250" y="${y - 10}" width="11" height="11" rx="3" fill="${CHART_COLORS[index % CHART_COLORS.length]}" />
+        <text x="270" y="${y}" font-size="12" fill="#0F172A">${escapeHtml(truncatePdfLabel(item.label, 26))}</text>
+        <text x="520" y="${y}" text-anchor="end" font-size="12" fill="#64748B">${item.value} (${formatPercent(ratio)})</text>`;
+    })
+    .join('');
+
+  return `
+    <svg class="pdf-chart pie-chart" viewBox="0 0 640 230" role="img">
+      <g transform="rotate(-90 110 110)">
+        ${slices}
+      </g>
+      <circle cx="110" cy="110" r="47" fill="#FFFFFF" />
+      <text x="110" y="107" text-anchor="middle" font-size="22" font-weight="700" fill="#0F172A">${total}</text>
+      <text x="110" y="128" text-anchor="middle" font-size="11" fill="#64748B">total</text>
+      ${legend}
+    </svg>`;
+}
+
+function buildPdfChartSvg(kind: ChartKind, data: ChartDataItem[]): string {
+  if (kind === 'pie') return buildPdfPieChartSvg(data);
+  if (kind === 'line') return buildPdfLineChartSvg(data);
+  return buildPdfBarChartSvg(data);
+}
+
+function buildPdfHtml(analytics: FormAnalytics): string {
+  const dailyChart = buildPdfLineChartSvg(
+    analytics.dailySubmissions.map((item) => ({
+      label: formatDateLabel(item.date),
+      value: item.count,
+    }))
+  );
+
   const fieldSections = analytics.fields
     .map((field) => {
-      const total = field.series.reduce((sum, item) => sum + item.count, 0);
-      const rows = field.series
-        .map((item) => {
-          const ratio = total > 0 ? item.count / total : 0;
-          return `
-            <tr>
-              <td>${escapeHtml(item.label)}</td>
-              <td>${item.count}</td>
-              <td>${formatPercent(ratio)}</td>
-            </tr>`;
-        })
-        .join('');
-
+      const chartKind = normalizeChartKind(field.chart);
+      const chartData = field.series.map((item) => ({ label: item.label, value: item.count }));
       const statsLabel = buildStatsLabel(field.stats);
 
       return `
-        <section>
+        <section class="card">
           <h2>${escapeHtml(field.label)}</h2>
-          <p>Tipo: ${escapeHtml(field.type)} | Respondido: ${field.totalAnswered}</p>
+          <p>Tipo: ${escapeHtml(field.type)} | Respondido: ${field.totalAnswered} | Grafico: ${chartKind}</p>
           ${statsLabel ? `<p>${escapeHtml(statsLabel)}</p>` : ''}
-          <table>
-            <thead>
-              <tr><th>Resposta</th><th>Quantidade</th><th>Percentual</th></tr>
-            </thead>
-            <tbody>${rows || '<tr><td colspan="3">Sem valores para este campo.</td></tr>'}</tbody>
-          </table>
+          ${buildPdfChartSvg(chartKind, chartData)}
         </section>`;
     })
     .join('');
@@ -117,32 +233,29 @@ function buildPdfHtml(analytics: FormAnalytics): string {
       <head>
         <meta charset="utf-8" />
         <style>
-          body { font-family: Arial, sans-serif; color: #0f172a; padding: 24px; }
+          body { font-family: Arial, sans-serif; color: #0f172a; padding: 24px; background: #ffffff; }
           h1 { font-size: 24px; margin: 0 0 6px; }
-          h2 { font-size: 16px; margin: 24px 0 6px; }
+          h2 { font-size: 16px; margin: 0 0 6px; }
           p { color: #475569; margin: 4px 0 12px; }
           .summary { display: flex; gap: 12px; margin: 18px 0; }
           .metric { border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px; flex: 1; }
           .metric strong { display: block; font-size: 22px; color: ${ACCENT}; }
-          table { width: 100%; border-collapse: collapse; margin-top: 8px; }
-          th, td { border: 1px solid #e2e8f0; padding: 8px; text-align: left; font-size: 12px; }
-          th { background: #f8fafc; }
-          section { page-break-inside: avoid; }
+          .card { border: 1px solid #e2e8f0; border-radius: 10px; padding: 14px 16px; margin-top: 14px; page-break-inside: avoid; }
+          .pdf-chart { display: block; width: 100%; max-width: 640px; height: auto; margin-top: 8px; }
+          .pie-chart { max-width: 620px; }
+          .empty { padding: 18px; border-radius: 8px; background: #f8fafc; color: #64748b; }
         </style>
       </head>
       <body>
-        <h1>${escapeHtml(analytics.title || 'Analytics do formulário')}</h1>
-        <p>Relatório exportado do dashboard.</p>
+        <h1>${escapeHtml(analytics.title || 'Analytics do formulario')}</h1>
+        <p>Relatorio exportado do dashboard.</p>
         <div class="summary">
           <div class="metric"><strong>${analytics.totalSubmissions}</strong>Total de respostas</div>
           <div class="metric"><strong>${formatPercent(analytics.completionRate)}</strong>Taxa de preenchimento</div>
         </div>
-        <section>
+        <section class="card">
           <h2>Respostas por dia</h2>
-          <table>
-            <thead><tr><th>Data</th><th>Quantidade</th></tr></thead>
-            <tbody>${dailyRows || '<tr><td colspan="2">Sem respostas no período.</td></tr>'}</tbody>
-          </table>
+          ${dailyChart}
         </section>
         ${fieldSections}
       </body>
@@ -301,7 +414,7 @@ function LineChart({ data, emptyLabel }: { data: ChartDataItem[]; emptyLabel: st
               {point.value}
             </SvgText>
             <SvgText x={point.x} y={height - 14} textAnchor="middle" fill="#64748B" fontSize="10">
-              {point.label.length > 8 ? `${point.label.slice(0, 7)}…` : point.label}
+              {point.label.length > 8 ? `${point.label.slice(0, 7)}Ã¢â‚¬Â¦` : point.label}
             </SvgText>
           </G>
         ))}
@@ -341,7 +454,7 @@ function InteractiveFieldCard({
 
         <View style={styles.toggleContainer}>
           <TouchableOpacity
-            accessibilityLabel="Ver gráfico de barras"
+            accessibilityLabel="Ver grÃƒÂ¡fico de barras"
             style={[styles.toggleBtn, currentChart === 'bar' && styles.toggleBtnActive]}
             onPress={() => setCurrentChart('bar')}>
             <Ionicons
@@ -351,7 +464,7 @@ function InteractiveFieldCard({
             />
           </TouchableOpacity>
           <TouchableOpacity
-            accessibilityLabel="Ver gráfico de pizza"
+            accessibilityLabel="Ver grÃƒÂ¡fico de pizza"
             style={[styles.toggleBtn, currentChart === 'pie' && styles.toggleBtnActive]}
             onPress={() => setCurrentChart('pie')}>
             <Ionicons
@@ -361,7 +474,7 @@ function InteractiveFieldCard({
             />
           </TouchableOpacity>
           <TouchableOpacity
-            accessibilityLabel="Ver gráfico de linha"
+            accessibilityLabel="Ver grÃƒÂ¡fico de linha"
             style={[styles.toggleBtn, currentChart === 'line' && styles.toggleBtnActive]}
             onPress={() => setCurrentChart('line')}>
             <Ionicons
@@ -377,7 +490,7 @@ function InteractiveFieldCard({
 
       <View style={styles.chartArea}>
         {currentChart === 'pie' ? (
-          <PieChart data={chartData} emptyLabel="Sem distribuição para este campo." />
+          <PieChart data={chartData} emptyLabel="Sem distribuiÃƒÂ§ÃƒÂ£o para este campo." />
         ) : currentChart === 'line' ? (
           <LineChart data={chartData} emptyLabel="Sem pontos para exibir em linha." />
         ) : (
@@ -403,7 +516,7 @@ export default function AnalyticsScreen() {
 
   const loadAnalytics = useCallback(async () => {
     if (!formId) {
-      setErrorMessage('ID do formulário não informado na rota.');
+      setErrorMessage('ID do formulÃƒÂ¡rio nÃƒÂ£o informado na rota.');
       setLoading(false);
       setRefreshing(false);
       return;
@@ -444,7 +557,8 @@ export default function AnalyticsScreen() {
         Alert.alert('PDF gerado', `Arquivo criado em: ${uri}`);
       }
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Não foi possível gerar o PDF.';
+      const message =
+        error instanceof Error ? error.message : 'NÃƒÂ£o foi possÃƒÂ­vel gerar o PDF.';
       Alert.alert('Erro ao exportar PDF', message);
     } finally {
       setExporting(false);
@@ -491,8 +605,8 @@ export default function AnalyticsScreen() {
           }>
           <View style={styles.pageHeader}>
             <View style={styles.pageTitleWrap}>
-              <Text style={styles.title}>{analytics?.title || 'Analytics do formulário'}</Text>
-              <Text style={styles.subtitle}>Painel dinâmico por tipo de campo</Text>
+              <Text style={styles.title}>{analytics?.title || 'Analytics do formulÃƒÂ¡rio'}</Text>
+              <Text style={styles.subtitle}>Painel dinÃƒÂ¢mico por tipo de campo</Text>
             </View>
 
             <TouchableOpacity
@@ -525,7 +639,7 @@ export default function AnalyticsScreen() {
 
           <View style={styles.cardGrafico}>
             <Text style={styles.chartTitle}>Respostas por dia</Text>
-            <LineChart data={dailyData} emptyLabel="Sem respostas para exibir no período." />
+            <LineChart data={dailyData} emptyLabel="Sem respostas para exibir no perÃƒÂ­odo." />
           </View>
 
           {(analytics?.fields || []).map((field) => (
