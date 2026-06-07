@@ -93,45 +93,51 @@ export default function EditForm() {
 
   return (
     <View style={{ flex: 1, backgroundColor: THEME.colors.background }}>
-      <Stack.Screen options={{ title: 'Editar Formulario' }} />
+      <Stack.Screen options={{ title: 'Editar Formulario', headerTintColor: projectColor }} />
 
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
-        <ScrollView contentContainerStyle={{ paddingTop: 20, paddingBottom: 110 }}>
-          <Container>
-            <FormEditor
-              title={title}
-              setTitle={setTitle}
-              description={description}
-              setDescription={setDescription}
-              fields={fields}
-              setFields={setFields}
-              accentColor={projectColor}
-            />
-
-            <View style={{ marginTop: 16, borderWidth: 1, borderColor: THEME.colors.border, borderRadius: 12, padding: 14, backgroundColor: THEME.colors.surface }}>
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                <View style={{ flex: 1, paddingRight: 10 }}>
-                  <Text style={{ color: THEME.colors.textPrimary, fontFamily: 'Jakarta-Bold', fontSize: 14 }}>Formulario publico</Text>
-                  <Text style={{ color: THEME.colors.textSecondary, fontSize: 12, marginTop: 4 }}>
-                    Se ativado, usuarios fora do projeto podem responder.
-                  </Text>
+      <KeyboardAvoidingView 
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'} 
+        style={{ flex: 1 }}
+      >
+        {/* 1. Removemos o ScrollView e mantemos o Container envolvendo a lista */}
+        <Container style={{ flex: 1 }}>
+          <FormEditor
+            title={title}
+            setTitle={setTitle}
+            description={description}
+            setDescription={setDescription}
+            fields={fields}
+            setFields={setFields}
+            accentColor={projectColor}
+            
+            // 2. PASSAMOS O CARD COMO COMPONENTE ADICIONAL DE RODAPÉ
+            renderAdditionalFooter={() => (
+              <View style={{ marginTop: 16, borderWidth: 1, borderColor: THEME.colors.border, borderRadius: 12, padding: 14, backgroundColor: THEME.colors.surface }}>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <View style={{ flex: 1, paddingRight: 10 }}>
+                    <Text style={{ color: THEME.colors.textPrimary, fontFamily: 'Jakarta-Bold', fontSize: 14 }}>Formulario publico</Text>
+                    <Text style={{ color: THEME.colors.textSecondary, fontSize: 12, marginTop: 4 }}>
+                      Se ativado, usuarios fora do projeto podem responder.
+                    </Text>
+                  </View>
+                  <Switch
+                    value={isPublic}
+                    onValueChange={setIsPublic}
+                    trackColor={{ true: `${projectColor}88` }}
+                    thumbColor={isPublic ? projectColor : '#f4f4f5'}
+                  />
                 </View>
-                <Switch
-                  value={isPublic}
-                  onValueChange={setIsPublic}
-                  trackColor={{ true: `${projectColor}88` }}
-                  thumbColor={isPublic ? projectColor : '#f4f4f5'}
-                />
               </View>
-            </View>
-          </Container>
-        </ScrollView>
+            )}
+          />
+        </Container>
 
+        {/* Botão Salvar permanece fixo na parte inferior, perfeito! */}
         <View style={{ padding: 20, backgroundColor: THEME.colors.background, borderTopWidth: 1, borderTopColor: THEME.colors.border }}>
           <TouchableOpacity
             onPress={handleUpdate}
             disabled={saving}
-              style={{ backgroundColor: projectColor, height: 55, borderRadius: 16, justifyContent: 'center', alignItems: 'center', opacity: saving ? 0.7 : 1 }}
+            style={{ backgroundColor: projectColor, height: 55, borderRadius: 16, justifyContent: 'center', alignItems: 'center', opacity: saving ? 0.7 : 1 }}
           >
             {saving ? <ActivityIndicator color="#FFF" /> : <Text style={{ color: '#FFF', fontFamily: 'Jakarta-Bold' }}>SALVAR ALTERACOES</Text>}
           </TouchableOpacity>

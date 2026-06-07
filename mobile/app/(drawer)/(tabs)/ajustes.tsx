@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, ScrollView } from 'react-native';
-import { Stack } from 'expo-router';
+import { Drawer } from 'expo-router/drawer';
 import { Ionicons } from '@expo/vector-icons';
 
 import Container from '@/components/common/Container';
@@ -51,9 +51,8 @@ export default function Settings() {
 
   return (
     <View style={styles.mainContainer}>
-      <Stack.Screen options={{ 
-        headerShown: true, 
-        title: 'Ajustes do Sistema',
+      <Drawer.Screen options={{ 
+        title: 'Sistema',
         headerTitleStyle: { fontFamily: 'Jakarta-Bold', color: THEME.colors.textPrimary }
       }} />
 

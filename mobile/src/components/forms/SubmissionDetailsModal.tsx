@@ -20,14 +20,35 @@ export function SubmissionDetailsModal({
 
   const fields = Object.entries(submission.formData || {});
 
-  const getQuestionTitle = (fieldId: string) => {
-    const matchedField = formFields.find((f) => {
-      const fieldValue = f?.fieldId ?? f?.id ?? f?.key ?? f?.name;
-      return fieldValue === fieldId;
-    });
+const getQuestionTitle = (fieldId: string) => {
+  // 1. Tenta achar o campo mapeado na estrutura atual
+  const matchedField = formFields.find((f, index) => {
+    const idDoCampo = f?.fieldId ?? f?.id ?? f?.key ?? f?.name;
+    const idGeradoPeloIndex = `field-${index}`;
 
-    return matchedField?.label || matchedField?.title || matchedField?.question || 'Pergunta';
-  };
+    return (
+      String(idDoCampo) === String(fieldId) || 
+      idGeradoPeloIndex === String(fieldId) ||
+      String(index) === String(fieldId)
+    );
+  });
+
+  if (matchedField) {
+    return matchedField?.label || matchedField?.title || matchedField?.question;
+  }
+
+  // 2. SE NÃO ACHOU (HISTÓRICO): Descobre qual era a posição desse ID no formData original
+  // para exibir algo amigável como "Pergunta 1 (Histórico)"
+  const formDataKeys = Object.keys(submission.formData || {});
+  const position = formDataKeys.indexOf(fieldId);
+
+  if (position !== -1) {
+    return `Pergunta ${position + 1}`; // Retorna "Pergunta 1", "Pergunta 2", etc.
+  }
+
+  // 3. Último caso de segurança absoluto
+  return 'Pergunta Respondida';
+};
 
   return (
     <Modal visible={Boolean(submission)} animationType="slide" transparent onRequestClose={onClose}>

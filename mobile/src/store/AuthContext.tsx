@@ -5,6 +5,7 @@ import NetInfo from '@react-native-community/netinfo';
 import { useRouter, useSegments } from 'expo-router';
 import { api } from '../services/api';
 import { SubmissionRepositoryImpl } from '@/data/forms/repositories/SubmissionRepositoryImpl';
+import { registerForPushNotificationsAsync, syncPushTokenWithBackend } from '@/services/notifications/pushNotifications';
 
 interface AuthContextData {
   signed: boolean;
@@ -69,6 +70,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (storageToken) {
           const response = await api.get('/auth/me');
           setUser(response.data);
+
+          const pushToken = await registerForPushNotificationsAsync();
+          if (pushToken) {
+            await syncPushTokenWithBackend(pushToken);
+          }
         }
       } catch (error) {
         const state = await NetInfo.fetch();
@@ -133,6 +139,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       
       const userResponse = await api.get('/auth/me');
       setUser(userResponse.data);
+
+      const pushToken = await registerForPushNotificationsAsync();
+      if (pushToken) {
+        await syncPushTokenWithBackend(pushToken);
+      }
     } catch (error) {
       console.error("Erro no login:", error);
       throw error;

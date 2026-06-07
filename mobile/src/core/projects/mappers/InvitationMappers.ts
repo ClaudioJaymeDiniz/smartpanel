@@ -7,7 +7,7 @@ export class InvitationMapper {
       email: raw.email,
       projectId: raw.projectId,
       status: raw.status as any,
-      invitedAt: new Date(raw.invitedAt),
+      invitedAt: new Date(raw.invitedAt || raw.createdAt),
     };
   }
 

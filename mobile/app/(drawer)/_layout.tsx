@@ -14,7 +14,6 @@ import Logo from '@/components/common/Logo';
 
 
 function CustomDrawerContent(props: any) {
-
   const { alertConfig, showAlert, hideAlert } = useAlert(); 
   const router = useRouter();
   const { user, logout } = useAuthStore(); 
@@ -35,6 +34,9 @@ function CustomDrawerContent(props: any) {
     );
   };
 
+  // Detecta qual rota está aberta para marcar o botão correspondente como ativo
+  const currentRouteName = props.state.routeNames[props.state.index];
+
   return (
     <DrawerContentScrollView {...props} contentContainerStyle={{ flex: 1 }}>
       <SmartAlert {...alertConfig} onCancel={hideAlert} />
@@ -50,7 +52,7 @@ function CustomDrawerContent(props: any) {
       <View style={{ flex: 1, marginTop: 10 }}>
         <DrawerItem
           label="Painel Principal"
-          focused={props.state.routeNames[props.state.index] === '(tabs)'}
+          focused={currentRouteName === '(tabs)'}
           labelStyle={{ fontFamily: 'Manrope-SemiBold' }}
           activeTintColor={THEME.colors.primary}
           icon={({ color }) => <Ionicons name="grid-outline" size={22} color={color} />}
@@ -58,7 +60,7 @@ function CustomDrawerContent(props: any) {
         />
         <DrawerItem
           label="Explorar"
-          focused={props.state.routeNames[props.state.index] === 'explore'}
+          focused={currentRouteName === 'explore'}
           labelStyle={{ fontFamily: 'Manrope-SemiBold' }}
           activeTintColor={THEME.colors.primary}
           icon={({ color }) => <Ionicons name="search-outline" size={22} color={color} />}
@@ -66,11 +68,21 @@ function CustomDrawerContent(props: any) {
         />
         <DrawerItem
           label="Perfil"
-          focused={props.state.routeNames[props.state.index] === 'profile'}
+          focused={currentRouteName === 'profile'}
           labelStyle={{ fontFamily: 'Manrope-SemiBold' }}
           activeTintColor={THEME.colors.primary}
           icon={({ color }) => <Ionicons name="person-outline" size={22} color={color} />}
           onPress={() => router.push('/(drawer)/(tabs)/profile')}
+        />
+
+        <DrawerItem
+          label="Ajustes"
+          focused={props.state.routes[props.state.index].name.includes('ajustes') || currentRouteName === 'ajustes'}
+          labelStyle={{ fontFamily: 'Manrope-SemiBold' }}
+          activeTintColor={THEME.colors.primary}
+          // Forçando a cor do tema ou preta direto para testar a visibilidade:
+          icon={() => <Ionicons name="settings-outline" size={22} color={THEME.colors.primary} />}
+          onPress={() => router.push('/ajustes')} 
         />
       </View>
 
@@ -101,13 +113,17 @@ export default function DrawerLayout() {
         headerShadowVisible: false,
         headerStyle: { backgroundColor: THEME.colors.background },
         drawerStyle: {
-          backgroundColor: THEME.colors.background, // Cor pérola do seu THEME
+          backgroundColor: THEME.colors.background,
           width: 300,
         },
         drawerActiveTintColor: THEME.colors.primary,
       }}
     >
-      <Drawer.Screen name="(tabs)" options={{ drawerLabel: 'Painel Principal' }} />
+      {/* Deixamos APENAS o grupo principal aqui. O Expo Router se encarrega do resto */}
+      <Drawer.Screen 
+        name="(tabs)" 
+        options={{ drawerLabel: 'Painel Principal' }} 
+      />
     </Drawer>
   );
 }

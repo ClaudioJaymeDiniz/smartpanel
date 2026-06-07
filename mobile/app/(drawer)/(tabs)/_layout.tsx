@@ -57,6 +57,18 @@ export default function TabLayout() {
           ),
         }}
       />
+      <Tabs.Screen
+        name="ajustes" // Deve ser exatamente o nome do seu arquivo ajustes.tsx
+        options={{
+          title: 'Ajustes',
+          // Aqui injetamos a engrenagem perfeita para a barra de baixo
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="settings-outline" size={size} color={color} />
+          ),
+        }}
+      />
+
+      
     </Tabs>
   );
 }

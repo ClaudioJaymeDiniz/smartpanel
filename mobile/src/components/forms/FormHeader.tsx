@@ -13,7 +13,7 @@ interface FormHeaderProps {
   accentColor: string;
   accentSoft: string;
   accentBorder: string;
-  onBack: () => void;
+  onBack?: () => void;
 }
 
 export function FormHeader({
@@ -30,9 +30,11 @@ export function FormHeader({
 }: FormHeaderProps) {
   return (
     <View>
-      <TouchableOpacity style={[styles.backButton, { backgroundColor: `${accentColor}12` }]} onPress={onBack}>
-        <Ionicons name="arrow-back" size={22} color={accentColor} />
-      </TouchableOpacity>
+      {onBack && (
+        <TouchableOpacity style={[styles.backButton, { backgroundColor: `${accentColor}12` }]} onPress={onBack}>
+          <Ionicons name="arrow-back" size={22} color={accentColor} />
+        </TouchableOpacity>
+      )}
 
       <Text style={styles.title}>{title}</Text>
       <Text style={styles.description}>{description || 'Visualize as respostas enviadas.'}</Text>

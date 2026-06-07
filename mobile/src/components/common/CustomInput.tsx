@@ -12,9 +12,10 @@ import { THEME } from '../../styles/theme'; // Ajuste o caminho conforme sua est
 interface Props extends TextInputProps {
   label: string;
   value: string;
+  accentColor?: string;
 }
 
-const CustomInput: React.FC<Props> = ({ label, value, ...rest }) => {
+const CustomInput: React.FC<Props> = ({ label, value, accentColor, ...rest }) => {
   const [isFocused, setIsFocused] = useState(false);
   
   // Inicia em 1 se já houver texto (ex: preenchimento automático)
@@ -51,7 +52,7 @@ const CustomInput: React.FC<Props> = ({ label, value, ...rest }) => {
     }),
     color: animatedValue.interpolate({
       inputRange: [0, 1],
-      outputRange: [THEME.colors.textSecondary, THEME.colors.primary], // Muda de Cinza para Verde
+      outputRange: [THEME.colors.textSecondary, accentColor || THEME.colors.primary],
     }),
     fontFamily: isFocused ? 'Jakarta-Bold' : 'Jakarta-Regular',
   };
@@ -65,7 +66,7 @@ const CustomInput: React.FC<Props> = ({ label, value, ...rest }) => {
         {...rest}
         style={[
           styles.input,
-          { borderBottomColor: isFocused ? THEME.colors.primary : THEME.colors.border }
+          { borderBottomColor: isFocused ? (accentColor || THEME.colors.primary) : THEME.colors.border }
         ]}
         value={value}
         onFocus={handleFocus}

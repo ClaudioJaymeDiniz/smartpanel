@@ -262,12 +262,12 @@ export class ProjectRepositoryImpl implements IProjectRepository {
   async findById(id: string): Promise<any> {
     try {
       const response = await api.get(`/projects/${id}`);
-      const project = response.data;
+      const project = ProjectMapper.toDomain(response.data);
 
       // Aproveita para atualizar o cache individual se a busca online deu certo
       db.runSync(
         'INSERT OR REPLACE INTO projects_cache (id, name, data) VALUES (?, ?, ?)',
-        [project.id, project.name, JSON.stringify(project)]
+        [project.id, project.name, JSON.stringify(response.data)]
       );
 
       return project;
@@ -290,7 +290,7 @@ export class ProjectRepositoryImpl implements IProjectRepository {
       );
 
       if (result) {
-        return JSON.parse(result.data);
+        return ProjectMapper.toDomain(JSON.parse(result.data));
       }
 
       throw new Error("Não foi possível carregar os detalhes do projeto (Offline e sem cache).");

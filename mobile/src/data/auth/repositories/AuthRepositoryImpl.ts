@@ -6,6 +6,7 @@ import { IAuthRepository } from '@/core/auth/domain/repositories/IAuthRepository
 import { LoginCredentials, RegisterData } from '@/core/auth/domain/entities/AuthCredentials';
 import { AuthSession, User } from '@/core/auth/domain/entities/User';
 import { UserMapper } from '@/core/auth/mappers/UserMapper';
+import { registerForPushNotificationsAsync, syncPushTokenWithBackend } from '@/services/notifications/pushNotifications';
 
 const USER_CACHE_KEY = 'auth_user_cache';
 const LOGIN_CACHE_KEY = 'auth_login_cache';
@@ -102,6 +103,10 @@ export class AuthRepositoryImpl implements IAuthRepository {
       await SecureStore.setItemAsync('user_token', access_token);
       
       const user = await this.getMe();
+      const pushToken = await registerForPushNotificationsAsync();
+      if (pushToken) {
+        await syncPushTokenWithBackend(pushToken);
+      }
       await Promise.all([
         this.cacheUser(user),
         this.cacheLogin(credentials.email, credentials.password || ''),
@@ -153,6 +158,11 @@ export class AuthRepositoryImpl implements IAuthRepository {
     
     const user = await this.getMe();
     await this.cacheUser(user);
+
+    const pushToken = await registerForPushNotificationsAsync();
+    if (pushToken) {
+      await syncPushTokenWithBackend(pushToken);
+    }
 
     return { 
       accessToken: access_token, 

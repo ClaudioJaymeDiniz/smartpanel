@@ -366,7 +366,7 @@ export default function FormDetails() {
             accentColor={accentColor}
             accentSoft={accentSoft}
             accentBorder={accentBorder}
-            onBack={() => router.back()}
+            //onBack={() => router.back()}
           />
 
           <View style={styles.actionsRow}>
@@ -422,8 +422,11 @@ export default function FormDetails() {
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: THEME.colors.background },
-  centered: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: THEME.colors.background },
+  screen: { flex: 1, 
+    backgroundColor: THEME.colors.background },
+  centered: { flex: 1, justifyContent: 'center', 
+    alignItems: 'center', 
+    backgroundColor: THEME.colors.background },
   scroll: { paddingVertical: 20 },
   actionsRow: { marginBottom: 16 },
   sectionTitle: { marginTop: 6, marginBottom: 10, fontSize: 16, fontFamily: 'Jakarta-Bold', color: THEME.colors.textPrimary },
