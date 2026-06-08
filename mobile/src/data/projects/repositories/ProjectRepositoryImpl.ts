@@ -55,7 +55,6 @@ function dedupeProjects(projects: Project[]): Project[] {
 }
 
 export class ProjectRepositoryImpl implements IProjectRepository {
-  
   // 1. LISTAR ATIVOS
   async listActive(): Promise<Project[]> {
     try {
@@ -67,16 +66,17 @@ export class ProjectRepositoryImpl implements IProjectRepository {
         db.runSync("DELETE FROM projects_cache WHERE id LIKE 'temp-%'");
         db.runSync('DELETE FROM projects_cache');
         for (const p of projects) {
-          db.runSync(
-            'INSERT INTO projects_cache (id, name, data) VALUES (?, ?, ?)',
-            [p.id, p.name, JSON.stringify(p)]
-          );
+          db.runSync('INSERT INTO projects_cache (id, name, data) VALUES (?, ?, ?)', [
+            p.id,
+            p.name,
+            JSON.stringify(p),
+          ]);
         }
       } catch (cacheError) {
-        console.warn("Erro ao salvar cache:", cacheError);
+        console.warn('Erro ao salvar cache:', cacheError);
         // Continua mesmo se o cache falhar
       }
-      
+
       return ProjectMapper.toDomainList(dedupeProjects(projects));
     } catch (error) {
       if (!shouldUseOfflineFallback(error)) {
@@ -92,10 +92,10 @@ export class ProjectRepositoryImpl implements IProjectRepository {
       try {
         const cache: any[] = db.getAllSync('SELECT data FROM projects_cache');
         if (cache.length > 0) {
-          return ProjectMapper.toDomainList(dedupeProjects(cache.map(c => JSON.parse(c.data))));
+          return ProjectMapper.toDomainList(dedupeProjects(cache.map((c) => JSON.parse(c.data))));
         }
       } catch (cacheError) {
-        console.warn("Erro ao buscar cache local:", cacheError);
+        console.warn('Erro ao buscar cache local:', cacheError);
       }
       return [];
     }
@@ -108,7 +108,7 @@ export class ProjectRepositoryImpl implements IProjectRepository {
       return ProjectMapper.toDomainList(response.data);
     } catch (error) {
       // Na lixeira offline, retornamos vazio ou você pode criar uma tabela projects_archived_cache
-      return []; 
+      return [];
     }
   }
 
@@ -131,9 +131,9 @@ export class ProjectRepositoryImpl implements IProjectRepository {
         const result: any = db.getFirstSync('SELECT data FROM projects_cache WHERE id = ?', [id]);
         if (result) return ProjectMapper.toDomain(JSON.parse(result.data));
       } catch (cacheError) {
-        console.warn("Erro ao buscar projeto do cache:", cacheError);
+        console.warn('Erro ao buscar projeto do cache:', cacheError);
       }
-      throw new Error("Projeto não encontrado localmente.");
+      throw new Error('Projeto não encontrado localmente.');
     }
   }
 
@@ -143,23 +143,35 @@ export class ProjectRepositoryImpl implements IProjectRepository {
       const response = await api.post('/projects/', data);
       try {
         const created = response.data;
-        db.runSync(
-          'INSERT OR REPLACE INTO projects_cache (id, name, data) VALUES (?, ?, ?)',
-          [created.id, created.name, JSON.stringify(created)]
-        );
+        db.runSync('INSERT OR REPLACE INTO projects_cache (id, name, data) VALUES (?, ?, ?)', [
+          created.id,
+          created.name,
+          JSON.stringify(created),
+        ]);
       } catch (cacheError) {
         console.warn('Erro ao atualizar cache local de projeto:', cacheError);
       }
       return ProjectMapper.toDomain(response.data);
     } catch (error) {
+      if (!shouldUseOfflineFallback(error)) {
+        if (axios.isAxiosError(error)) {
+          const detail = (error.response?.data as any)?.detail;
+          throw new Error(detail || 'Falha ao criar projeto.');
+        }
+
+        throw error;
+      }
+
       const tempId = `temp-${Date.now()}`;
 
       // Salva na fila de sincronismo
       const queuedPayload = { ...data, _localTempId: tempId };
-      db.runSync(
-        'INSERT INTO sync_queue (endpoint, payload, method, status) VALUES (?, ?, ?, ?)',
-        ['/projects/', JSON.stringify(queuedPayload), 'POST', 'pending']
-      );
+      db.runSync('INSERT INTO sync_queue (endpoint, payload, method, status) VALUES (?, ?, ?, ?)', [
+        '/projects/',
+        JSON.stringify(queuedPayload),
+        'POST',
+        'pending',
+      ]);
 
       // Mantem no cache local para aparecer normalmente no offline.
       const localProject = {
@@ -171,20 +183,21 @@ export class ProjectRepositoryImpl implements IProjectRepository {
       };
 
       try {
-        db.runSync(
-          'INSERT OR REPLACE INTO projects_cache (id, name, data) VALUES (?, ?, ?)',
-          [tempId, data.name, JSON.stringify(localProject)]
-        );
+        db.runSync('INSERT OR REPLACE INTO projects_cache (id, name, data) VALUES (?, ?, ?)', [
+          tempId,
+          data.name,
+          JSON.stringify(localProject),
+        ]);
       } catch (cacheError) {
         console.warn('Erro ao salvar projeto offline no cache:', cacheError);
       }
 
-      return { 
+      return {
         id: tempId,
-        ...data, 
-        ownerId: 'local', 
-        isPublic: false, 
-        deletedAt: null 
+        ...data,
+        ownerId: 'local',
+        isPublic: false,
+        deletedAt: null,
       } as Project;
     }
   }
@@ -194,26 +207,39 @@ export class ProjectRepositoryImpl implements IProjectRepository {
     try {
       const response = await api.patch(`/projects/${id}`, data);
       const updated = response.data;
-      
-      // Atualiza o cache local para refletir a mudança online
-      db.runSync(
-        'UPDATE projects_cache SET name = ?, data = ? WHERE id = ?',
-        [updated.name, JSON.stringify(updated), id]
-      );
-      
+
+      db.runSync('UPDATE projects_cache SET name = ?, data = ? WHERE id = ?', [
+        updated.name,
+        JSON.stringify(updated),
+        id,
+      ]);
+
       return ProjectMapper.toDomain(updated);
     } catch (error) {
-      // Salva alteração na fila
-      db.runSync(
-        'INSERT INTO sync_queue (endpoint, payload, method, status) VALUES (?, ?, ?, ?)',
-        [`/projects/${id}`, JSON.stringify(data), 'PATCH', 'pending']
-      );
-      
-      // Atualiza o cache local IMEDIATAMENTE (UX)
+      if (!shouldUseOfflineFallback(error)) {
+        if (axios.isAxiosError(error)) {
+          const detail = (error.response?.data as any)?.detail;
+          throw new Error(detail || 'Falha ao atualizar projeto.');
+        }
+
+        throw error;
+      }
+
+      db.runSync('INSERT INTO sync_queue (endpoint, payload, method, status) VALUES (?, ?, ?, ?)', [
+        `/projects/${id}`,
+        JSON.stringify(data),
+        'PATCH',
+        'pending',
+      ]);
+
       const current: any = db.getFirstSync('SELECT data FROM projects_cache WHERE id = ?', [id]);
-      const updatedData = { ...JSON.parse(current.data), ...data };
-      db.runSync('UPDATE projects_cache SET data = ? WHERE id = ?', [JSON.stringify(updatedData), id]);
-      
+      const currentData = current?.data ? JSON.parse(current.data) : { id };
+      const updatedData = { ...currentData, ...data };
+      db.runSync('UPDATE projects_cache SET data = ? WHERE id = ?', [
+        JSON.stringify(updatedData),
+        id,
+      ]);
+
       return ProjectMapper.toDomain(updatedData);
     }
   }
@@ -223,10 +249,21 @@ export class ProjectRepositoryImpl implements IProjectRepository {
     try {
       await api.post(`/projects/${id}/restore`);
     } catch (error) {
-      db.runSync(
-        'INSERT INTO sync_queue (endpoint, payload, method, status) VALUES (?, ?, ?, ?)',
-        [`/projects/${id}/restore`, JSON.stringify({}), 'POST', 'pending']
-      );
+      if (!shouldUseOfflineFallback(error)) {
+        if (axios.isAxiosError(error)) {
+          const detail = (error.response?.data as any)?.detail;
+          throw new Error(detail || 'Falha ao restaurar projeto.');
+        }
+
+        throw error;
+      }
+
+      db.runSync('INSERT INTO sync_queue (endpoint, payload, method, status) VALUES (?, ?, ?, ?)', [
+        `/projects/${id}/restore`,
+        JSON.stringify({}),
+        'POST',
+        'pending',
+      ]);
     }
   }
 
@@ -236,10 +273,21 @@ export class ProjectRepositoryImpl implements IProjectRepository {
       await api.delete(`/projects/${id}`);
       db.runSync('DELETE FROM projects_cache WHERE id = ?', [id]);
     } catch (error) {
-      db.runSync(
-        'INSERT INTO sync_queue (endpoint, payload, method, status) VALUES (?, ?, ?, ?)',
-        [`/projects/${id}`, JSON.stringify({}), 'DELETE', 'pending']
-      );
+      if (!shouldUseOfflineFallback(error)) {
+        if (axios.isAxiosError(error)) {
+          const detail = (error.response?.data as any)?.detail;
+          throw new Error(detail || 'Falha ao arquivar projeto.');
+        }
+
+        throw error;
+      }
+
+      db.runSync('INSERT INTO sync_queue (endpoint, payload, method, status) VALUES (?, ?, ?, ?)', [
+        `/projects/${id}`,
+        JSON.stringify({}),
+        'DELETE',
+        'pending',
+      ]);
       db.runSync('DELETE FROM projects_cache WHERE id = ?', [id]);
     }
   }
@@ -265,10 +313,11 @@ export class ProjectRepositoryImpl implements IProjectRepository {
       const project = ProjectMapper.toDomain(response.data);
 
       // Aproveita para atualizar o cache individual se a busca online deu certo
-      db.runSync(
-        'INSERT OR REPLACE INTO projects_cache (id, name, data) VALUES (?, ?, ?)',
-        [project.id, project.name, JSON.stringify(response.data)]
-      );
+      db.runSync('INSERT OR REPLACE INTO projects_cache (id, name, data) VALUES (?, ?, ?)', [
+        project.id,
+        project.name,
+        JSON.stringify(response.data),
+      ]);
 
       return project;
     } catch (error) {
@@ -281,19 +330,16 @@ export class ProjectRepositoryImpl implements IProjectRepository {
         throw error;
       }
 
-      console.warn("Offline: buscando detalhes do projeto no cache local.");
-      
+      console.warn('Offline: buscando detalhes do projeto no cache local.');
+
       // Tenta recuperar do SQLite caso a API falhe (sem internet no Linux Mint)
-      const result: any = db.getFirstSync(
-        'SELECT data FROM projects_cache WHERE id = ?', 
-        [id]
-      );
+      const result: any = db.getFirstSync('SELECT data FROM projects_cache WHERE id = ?', [id]);
 
       if (result) {
         return ProjectMapper.toDomain(JSON.parse(result.data));
       }
 
-      throw new Error("Não foi possível carregar os detalhes do projeto (Offline e sem cache).");
+      throw new Error('Não foi possível carregar os detalhes do projeto (Offline e sem cache).');
     }
   }
 }

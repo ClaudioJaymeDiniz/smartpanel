@@ -16,7 +16,6 @@ function shouldUseOfflineFallback(error: unknown): boolean {
 }
 
 export class FormRepositoryImpl implements IFormRepository {
-
   async getPublicForms(): Promise<any[]> {
     try {
       const response = await api.get('/forms/public');
@@ -33,23 +32,37 @@ export class FormRepositoryImpl implements IFormRepository {
       const created = response.data;
 
       try {
-        db.runSync(
-          'INSERT OR REPLACE INTO forms_cache (id, projectId, data) VALUES (?, ?, ?)',
-          [created.id, created.projectId, JSON.stringify(created)]
-        );
+        db.runSync('INSERT OR REPLACE INTO forms_cache (id, projectId, data) VALUES (?, ?, ?)', [
+          created.id,
+          created.projectId,
+          JSON.stringify(created),
+        ]);
       } catch (cacheError) {
         console.warn('Erro ao salvar formulario no cache:', cacheError);
       }
 
       return FormMapper.toDomain(created);
     } catch (error) {
+      if (!shouldUseOfflineFallback(error)) {
+        if (axios.isAxiosError(error)) {
+          const detail = (error.response?.data as any)?.detail;
+          throw new Error(detail || 'Falha ao criar formulario.');
+        }
+
+        throw error;
+      }
+
       const tempId = `temp-form-${Date.now()}`;
 
+      const queuedPayload = { ...data, _localTempId: tempId };
+
       // Offline: Salva na fila para o useSync criar no backend depois
-      db.runSync(
-        'INSERT INTO sync_queue (endpoint, payload, method, status) VALUES (?, ?, ?, ?)',
-        ['/forms/', JSON.stringify(data), 'POST', 'pending']
-      );
+      db.runSync('INSERT INTO sync_queue (endpoint, payload, method, status) VALUES (?, ?, ?, ?)', [
+        '/forms/',
+        JSON.stringify(queuedPayload),
+        'POST',
+        'pending',
+      ]);
 
       // Salva imediatamente no cache de formularios para aparecer offline.
       const localForm = {
@@ -60,10 +73,11 @@ export class FormRepositoryImpl implements IFormRepository {
       };
 
       try {
-        db.runSync(
-          'INSERT OR REPLACE INTO forms_cache (id, projectId, data) VALUES (?, ?, ?)',
-          [tempId, data.projectId, JSON.stringify(localForm)]
-        );
+        db.runSync('INSERT OR REPLACE INTO forms_cache (id, projectId, data) VALUES (?, ?, ?)', [
+          tempId,
+          data.projectId,
+          JSON.stringify(localForm),
+        ]);
       } catch (cacheError) {
         console.warn('Erro ao salvar formulario offline no cache:', cacheError);
       }
@@ -83,7 +97,7 @@ export class FormRepositoryImpl implements IFormRepository {
     try {
       const response = await api.get(`/forms/project/${projectId}`);
       const forms = response.data;
-      
+
       // Sincroniza o cache local de formulários para este projeto
       try {
         db.runSync('DELETE FROM forms WHERE project_id = ?', [projectId]);
@@ -93,15 +107,16 @@ export class FormRepositoryImpl implements IFormRepository {
             'INSERT OR REPLACE INTO forms (id, project_id, title, data) VALUES (?, ?, ?, ?)',
             [f.id, projectId, f.title || f.name, JSON.stringify(f)]
           );
-          db.runSync(
-            'INSERT OR REPLACE INTO forms_cache (id, projectId, data) VALUES (?, ?, ?)',
-            [f.id, projectId, JSON.stringify(f)]
-          );
+          db.runSync('INSERT OR REPLACE INTO forms_cache (id, projectId, data) VALUES (?, ?, ?)', [
+            f.id,
+            projectId,
+            JSON.stringify(f),
+          ]);
         }
       } catch (cacheError) {
-        console.warn("Erro ao sincronizar cache de forms:", cacheError);
+        console.warn('Erro ao sincronizar cache de forms:', cacheError);
       }
-            
+
       return FormMapper.toDomainList(forms);
     } catch (error) {
       if (!shouldUseOfflineFallback(error)) {
@@ -113,31 +128,32 @@ export class FormRepositoryImpl implements IFormRepository {
         throw error;
       }
 
-      console.warn("Offline: buscando formulários no cache local.");
-      
+      console.warn('Offline: buscando formulários no cache local.');
+
       // Fallback: Busca na tabela específica de formulários
       try {
-        const cache: any[] = db.getAllSync(
-          'SELECT data FROM forms_cache WHERE projectId = ?', 
-          [projectId]
-        );
+        const cache: any[] = db.getAllSync('SELECT data FROM forms_cache WHERE projectId = ?', [
+          projectId,
+        ]);
 
         if (cache.length > 0) {
-          return FormMapper.toDomainList(cache.map(c => JSON.parse(c.data)));
+          return FormMapper.toDomainList(cache.map((c) => JSON.parse(c.data)));
         }
       } catch (cacheError) {
-        console.warn("Erro ao buscar forms_cache:", cacheError);
+        console.warn('Erro ao buscar forms_cache:', cacheError);
       }
 
       // Último recurso: Tenta dentro do projeto
       try {
-        const projectResult: any = db.getFirstSync('SELECT data FROM projects_cache WHERE id = ?', [projectId]);
+        const projectResult: any = db.getFirstSync('SELECT data FROM projects_cache WHERE id = ?', [
+          projectId,
+        ]);
         if (projectResult) {
           const projectData = JSON.parse(projectResult.data);
           return FormMapper.toDomainList(projectData.forms || []);
         }
       } catch (projectCacheError) {
-        console.warn("Erro ao buscar projeto do cache:", projectCacheError);
+        console.warn('Erro ao buscar projeto do cache:', projectCacheError);
       }
 
       return [];
@@ -146,45 +162,46 @@ export class FormRepositoryImpl implements IFormRepository {
 
   // 3. BUSCAR FORMULÁRIO POR ID (Muito mais rápido agora)
   async getById(id: string): Promise<Form> {
-  try {
-    const response = await api.get(`/forms/${id}`);
-    const formData = response.data;
-
-    // SALVA NO CACHE PARA USO FUTURO OFFLINE
     try {
-      db.runSync(
-        'INSERT OR REPLACE INTO forms_cache (id, projectId, data) VALUES (?, ?, ?)',
-        [id, formData.projectId || null, JSON.stringify(formData)]
-      );
-    } catch (cacheError) {
-      console.warn("Erro ao salvar form no cache:", cacheError);
-    }
+      const response = await api.get(`/forms/${id}`);
+      const formData = response.data;
 
-    return FormMapper.toDomain(formData);
-  } catch (error) {
-    if (!shouldUseOfflineFallback(error)) {
-      if (axios.isAxiosError(error)) {
-        const detail = (error.response?.data as any)?.detail;
-        throw new Error(detail || 'Falha ao carregar detalhes do formulário.');
+      // SALVA NO CACHE PARA USO FUTURO OFFLINE
+      try {
+        db.runSync('INSERT OR REPLACE INTO forms_cache (id, projectId, data) VALUES (?, ?, ?)', [
+          id,
+          formData.projectId || null,
+          JSON.stringify(formData),
+        ]);
+      } catch (cacheError) {
+        console.warn('Erro ao salvar form no cache:', cacheError);
       }
 
-      throw error;
-    }
+      return FormMapper.toDomain(formData);
+    } catch (error) {
+      if (!shouldUseOfflineFallback(error)) {
+        if (axios.isAxiosError(error)) {
+          const detail = (error.response?.data as any)?.detail;
+          throw new Error(detail || 'Falha ao carregar detalhes do formulário.');
+        }
 
-    // SE FALHAR A API, BUSCA NO CACHE
-    try {
-      const result: any = db.getFirstSync('SELECT data FROM forms_cache WHERE id = ?', [id]);
-      
-      if (result && result.data) {
-        return FormMapper.toDomain(JSON.parse(result.data));
+        throw error;
       }
-    } catch (cacheError) {
-      console.warn("Erro ao buscar form do cache:", cacheError);
-    }
 
-    throw new Error("Formulário não disponível offline. Conecte-se uma vez para baixar.");
+      // SE FALHAR A API, BUSCA NO CACHE
+      try {
+        const result: any = db.getFirstSync('SELECT data FROM forms_cache WHERE id = ?', [id]);
+
+        if (result && result.data) {
+          return FormMapper.toDomain(JSON.parse(result.data));
+        }
+      } catch (cacheError) {
+        console.warn('Erro ao buscar form do cache:', cacheError);
+      }
+
+      throw new Error('Formulário não disponível offline. Conecte-se uma vez para baixar.');
+    }
   }
-}
 
   // 4. ATUALIZAR FORMULÁRIO
   async update(id: string, data: Partial<FormCreate>): Promise<Form> {
@@ -193,21 +210,33 @@ export class FormRepositoryImpl implements IFormRepository {
       const updated = response.data;
 
       try {
-        db.runSync(
-          'INSERT OR REPLACE INTO forms_cache (id, projectId, data) VALUES (?, ?, ?)',
-          [updated.id, updated.projectId, JSON.stringify(updated)]
-        );
+        db.runSync('INSERT OR REPLACE INTO forms_cache (id, projectId, data) VALUES (?, ?, ?)', [
+          updated.id,
+          updated.projectId,
+          JSON.stringify(updated),
+        ]);
       } catch (cacheError) {
         console.warn('Erro ao atualizar cache do formulario:', cacheError);
       }
 
       return FormMapper.toDomain(updated);
     } catch (error) {
-      db.runSync(
-        'INSERT INTO sync_queue (endpoint, payload, method, status) VALUES (?, ?, ?, ?)',
-        [`/forms/${id}`, JSON.stringify(data), 'PATCH', 'pending']
-      );
-      
+      if (!shouldUseOfflineFallback(error)) {
+        if (axios.isAxiosError(error)) {
+          const detail = (error.response?.data as any)?.detail;
+          throw new Error(detail || 'Falha ao atualizar formulario.');
+        }
+
+        throw error;
+      }
+
+      db.runSync('INSERT INTO sync_queue (endpoint, payload, method, status) VALUES (?, ?, ?, ?)', [
+        `/forms/${id}`,
+        JSON.stringify(data),
+        'PATCH',
+        'pending',
+      ]);
+
       // Retorno genérico (será atualizado no próximo sync)
       return { id, ...data } as any;
     }
@@ -256,10 +285,11 @@ export class FormRepositoryImpl implements IFormRepository {
       const archived = response.data;
 
       try {
-        db.runSync(
-          'INSERT OR REPLACE INTO forms_cache (id, projectId, data) VALUES (?, ?, ?)',
-          [archived.id, archived.projectId, JSON.stringify(archived)]
-        );
+        db.runSync('INSERT OR REPLACE INTO forms_cache (id, projectId, data) VALUES (?, ?, ?)', [
+          archived.id,
+          archived.projectId,
+          JSON.stringify(archived),
+        ]);
       } catch (cacheError) {
         console.warn('Erro ao atualizar cache do formulario arquivado:', cacheError);
       }
@@ -275,7 +305,10 @@ export class FormRepositoryImpl implements IFormRepository {
           if (current?.data) {
             const cached = JSON.parse(current.data);
             cached.deletedAt = new Date().toISOString();
-            db.runSync('UPDATE forms_cache SET data = ? WHERE id = ?', [JSON.stringify(cached), id]);
+            db.runSync('UPDATE forms_cache SET data = ? WHERE id = ?', [
+              JSON.stringify(cached),
+              id,
+            ]);
           }
         } catch (cacheError) {
           console.warn('Erro ao arquivar formulario no cache local:', cacheError);
@@ -299,10 +332,11 @@ export class FormRepositoryImpl implements IFormRepository {
       const restored = response.data;
 
       try {
-        db.runSync(
-          'INSERT OR REPLACE INTO forms_cache (id, projectId, data) VALUES (?, ?, ?)',
-          [restored.id, restored.projectId, JSON.stringify(restored)]
-        );
+        db.runSync('INSERT OR REPLACE INTO forms_cache (id, projectId, data) VALUES (?, ?, ?)', [
+          restored.id,
+          restored.projectId,
+          JSON.stringify(restored),
+        ]);
       } catch (cacheError) {
         console.warn('Erro ao atualizar cache do formulario restaurado:', cacheError);
       }
@@ -318,7 +352,10 @@ export class FormRepositoryImpl implements IFormRepository {
           if (current?.data) {
             const cached = JSON.parse(current.data);
             cached.deletedAt = null;
-            db.runSync('UPDATE forms_cache SET data = ? WHERE id = ?', [JSON.stringify(cached), id]);
+            db.runSync('UPDATE forms_cache SET data = ? WHERE id = ?', [
+              JSON.stringify(cached),
+              id,
+            ]);
           }
         } catch (cacheError) {
           console.warn('Erro ao restaurar formulario no cache local:', cacheError);

@@ -9,7 +9,6 @@
 // import { useFormDetails } from '@/presentation/forms/hooks/useFormDetails';
 // import { FormRepositoryImpl } from '@/data/forms/repositories/FormRepositoryImpl';
 
-
 // import { FormHeader } from '@/components/forms/FormHeader';
 // import { FormActions } from '@/components/forms/FormActions';
 // import { SubmissionCard } from '@/components/forms/SubmissionCard';
@@ -51,7 +50,6 @@
 //     }, [loadData])
 //   );
 
-
 //   // Handlers de Ações (Redirecionamento / Repositório)
 //   const openAnswerScreen = () => {
 //     if (isFormArchived || isProjectArchived) {
@@ -84,7 +82,7 @@
 //       { text: 'Arquivar', style: 'destructive', onPress: async () => {
 //           await formRepo.archive(id as string);
 //           await loadData();
-//         } 
+//         }
 //       }
 //     ]);
 //   };
@@ -194,11 +192,18 @@
 //   emptyTitle: { marginTop: 10, fontFamily: 'Jakarta-Bold', color: THEME.colors.textPrimary, fontSize: 15 },
 // });
 
-
-
-
 import React, { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, Image, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Alert,
+  Image,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 import { Stack, useFocusEffect, useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -207,7 +212,6 @@ import Container from '@/components/common/Container';
 import { useAuthStore } from '@/presentation/auth/store/useAuthStore';
 import { useFormDetails } from '@/presentation/forms/hooks/useFormDetails';
 import { FormRepositoryImpl } from '@/data/forms/repositories/FormRepositoryImpl';
-
 
 import { FormHeader } from '@/components/forms/FormHeader';
 import { FormActions } from '@/components/forms/FormActions';
@@ -256,7 +260,9 @@ export default function FormDetails() {
     if (typeof value !== 'string') return false;
     const v = value.trim().toLowerCase();
     const keyLooksLikeImage = /image|imagem|foto|photo/.test(key.toLowerCase());
-    const urlLooksLikeImage = /\.(jpg|jpeg|png|webp|gif)(\?|$)/.test(v) || (v.includes('cloudinary.com') && v.includes('/image/upload/'));
+    const urlLooksLikeImage =
+      /\.(jpg|jpeg|png|webp|gif)(\?|$)/.test(v) ||
+      (v.includes('cloudinary.com') && v.includes('/image/upload/'));
     return keyLooksLikeImage || urlLooksLikeImage;
   };
 
@@ -270,7 +276,10 @@ export default function FormDetails() {
       const maybeUri = (value as any).uri;
       if (typeof maybeUri === 'string' && maybeUri.length > 0) {
         return (
-          <TouchableOpacity style={styles.imageThumbRow} onPress={() => setPreviewImage(maybeUri)} activeOpacity={0.85}>
+          <TouchableOpacity
+            style={styles.imageThumbRow}
+            onPress={() => setPreviewImage(maybeUri)}
+            activeOpacity={0.85}>
             <Image source={{ uri: maybeUri }} style={styles.imageThumb} />
             <Text style={styles.imageThumbHint}>Toque para ampliar</Text>
           </TouchableOpacity>
@@ -282,7 +291,10 @@ export default function FormDetails() {
     if (isImageLikeValue(key, value)) {
       const imageUrl = String(value);
       return (
-        <TouchableOpacity style={styles.imageThumbRow} onPress={() => setPreviewImage(imageUrl)} activeOpacity={0.85}>
+        <TouchableOpacity
+          style={styles.imageThumbRow}
+          onPress={() => setPreviewImage(imageUrl)}
+          activeOpacity={0.85}>
           <Image source={{ uri: imageUrl }} style={styles.imageThumb} />
           <Text style={styles.imageThumbHint}>Toque para ampliar</Text>
         </TouchableOpacity>
@@ -313,11 +325,14 @@ export default function FormDetails() {
   const handleArchiveForm = () => {
     Alert.alert('Arquivar formulário?', 'O formulário vai para a lixeira.', [
       { text: 'Cancelar', style: 'cancel' },
-      { text: 'Arquivar', style: 'destructive', onPress: async () => {
+      {
+        text: 'Arquivar',
+        style: 'destructive',
+        onPress: async () => {
           await formRepo.archive(id as string);
           await loadData();
-        } 
-      }
+        },
+      },
     ]);
   };
 
@@ -329,11 +344,14 @@ export default function FormDetails() {
   const handlePermanentDelete = () => {
     Alert.alert('Excluir definitivamente?', 'Essa ação não pode ser desfeita.', [
       { text: 'Cancelar', style: 'cancel' },
-      { text: 'Excluir', style: 'destructive', onPress: async () => {
+      {
+        text: 'Excluir',
+        style: 'destructive',
+        onPress: async () => {
           await formRepo.permanentDelete(id as string);
           router.back();
-        }
-      }
+        },
+      },
     ]);
   };
 
@@ -352,9 +370,15 @@ export default function FormDetails() {
       <ScrollView
         contentContainerStyle={styles.scroll}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); loadData(); }} colors={[THEME.colors.primary]} />
-        }
-      >
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={() => {
+              setRefreshing(true);
+              loadData();
+            }}
+            colors={[THEME.colors.primary]}
+          />
+        }>
         <Container>
           <FormHeader
             title={form?.title}
@@ -377,8 +401,15 @@ export default function FormDetails() {
               accentColor={accentColor}
               accentSoft={accentSoft}
               accentBorder={accentBorder}
-              onEditForm={() => router.push({ pathname: '/(form)/edit', params: { id: id as string } })}
-              onAnalytics={() => router.push({ pathname: '/(dashboard)/[formularioId]/analitics', params: { formularioId: id as string } })}
+              onEditForm={() =>
+                router.push({ pathname: '/(form)/edit', params: { id: id as string } })
+              }
+              onAnalytics={() =>
+                router.push({
+                  pathname: '/(dashboard)/[formularioId]/analitics',
+                  params: { formularioId: id as string },
+                })
+              }
               onExportCsv={handleExportCsv}
               onArchiveForm={handleArchiveForm}
               onRestoreForm={handleRestoreForm}
@@ -392,7 +423,9 @@ export default function FormDetails() {
           {submissions.length === 0 ? (
             <View style={styles.emptyState}>
               <Ionicons name="document-text-outline" size={42} color={THEME.colors.border} />
-              <Text style={styles.emptyTitle}>{isOwner ? 'Nenhuma resposta ainda' : 'Nenhuma resposta visível'}</Text>
+              <Text style={styles.emptyTitle}>
+                {isOwner ? 'Nenhuma resposta ainda' : 'Nenhuma resposta visível'}
+              </Text>
             </View>
           ) : (
             submissions.map((submission) => (
@@ -410,7 +443,7 @@ export default function FormDetails() {
       {/* Modal 1: Ficha completa com todas as perguntas/respostas */}
       <SubmissionDetailsModal
         submission={selectedSubmission}
-        formFields={form?.fields}
+        formFields={form?.structure}
         onClose={() => setSelectedSubmission(null)}
         renderFieldValue={renderFieldValue}
       />
@@ -422,18 +455,45 @@ export default function FormDetails() {
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, 
-    backgroundColor: THEME.colors.background },
-  centered: { flex: 1, justifyContent: 'center', 
-    alignItems: 'center', 
-    backgroundColor: THEME.colors.background },
+  screen: { flex: 1, backgroundColor: THEME.colors.background },
+  centered: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: THEME.colors.background,
+  },
   scroll: { paddingVertical: 20 },
   actionsRow: { marginBottom: 16 },
-  sectionTitle: { marginTop: 6, marginBottom: 10, fontSize: 16, fontFamily: 'Jakarta-Bold', color: THEME.colors.textPrimary },
-  emptyState: { marginTop: 10, borderRadius: 16, borderWidth: 1, borderColor: THEME.colors.border, backgroundColor: THEME.colors.surface, padding: 24, alignItems: 'center' },
-  emptyTitle: { marginTop: 10, fontFamily: 'Jakarta-Bold', color: THEME.colors.textPrimary, fontSize: 15 },
+  sectionTitle: {
+    marginTop: 6,
+    marginBottom: 10,
+    fontSize: 16,
+    fontFamily: 'Jakarta-Bold',
+    color: THEME.colors.textPrimary,
+  },
+  emptyState: {
+    marginTop: 10,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: THEME.colors.border,
+    backgroundColor: THEME.colors.surface,
+    padding: 24,
+    alignItems: 'center',
+  },
+  emptyTitle: {
+    marginTop: 10,
+    fontFamily: 'Jakarta-Bold',
+    color: THEME.colors.textPrimary,
+    fontSize: 15,
+  },
   fieldValue: { color: THEME.colors.textPrimary, fontSize: 14, marginBottom: 8 },
   imageThumbRow: { marginTop: 8, alignItems: 'center' },
-  imageThumb: { width: 140, height: 100, borderRadius: 8, resizeMode: 'cover', backgroundColor: THEME.colors.border },
+  imageThumb: {
+    width: 140,
+    height: 100,
+    borderRadius: 8,
+    resizeMode: 'cover',
+    backgroundColor: THEME.colors.border,
+  },
   imageThumbHint: { marginTop: 6, fontSize: 12, color: THEME.colors.textSecondary },
 });

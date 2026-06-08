@@ -9,10 +9,12 @@ import * as SQLite from 'expo-sqlite';
 const db = SQLite.openDatabaseSync('smartpanel.db');
 
 async function queueSubmission(endpoint: string, payload: any, method: 'POST' | 'PATCH') {
-  db.runSync(
-    'INSERT INTO sync_queue (endpoint, payload, method, status) VALUES (?, ?, ?, ?)',
-    [endpoint, JSON.stringify(payload), method, 'pending']
-  );
+  db.runSync('INSERT INTO sync_queue (endpoint, payload, method, status) VALUES (?, ?, ?, ?)', [
+    endpoint,
+    JSON.stringify(payload),
+    method,
+    'pending',
+  ]);
 }
 
 function createLocalSubmission(data: SubmissionCreate): Submission {
@@ -26,7 +28,6 @@ function createLocalSubmission(data: SubmissionCreate): Submission {
 }
 
 export class SubmissionRepositoryImpl implements ISubmissionRepository {
-  
   // 1. ENVIAR RESPOSTA (O coração do Sync Offline)
   async send(data: SubmissionCreate): Promise<Submission> {
     let normalizedData = data;
@@ -76,9 +77,9 @@ export class SubmissionRepositoryImpl implements ISubmissionRepository {
       const response = await api.get('/submissions/me');
       return SubmissionMapper.toDomainList(response.data);
     } catch (error) {
-      // Opcional: Você pode criar uma tabela submissions_cache se quiser 
+      // Opcional: Você pode criar uma tabela submissions_cache se quiser
       // que o coletor veja o histórico dele offline.
-      return []; 
+      return [];
     }
   }
 
@@ -89,7 +90,7 @@ export class SubmissionRepositoryImpl implements ISubmissionRepository {
       return SubmissionMapper.toDomainList(response.data);
     } catch (error) {
       if (axios.isAxiosError(error) && !error.response) {
-        console.warn("Offline: Não é possível listar respostas de terceiros sem conexão.");
+        console.warn('Offline: Não é possível listar respostas de terceiros sem conexão.');
         return [];
       }
 
@@ -107,6 +108,11 @@ export class SubmissionRepositoryImpl implements ISubmissionRepository {
       const response = await api.get(`/submissions/form/${formId}/all`);
       return SubmissionMapper.toDomainList(response.data);
     } catch (error) {
+      if (axios.isAxiosError(error) && !error.response) {
+        console.warn('Offline: Nao e possivel listar todas as respostas sem conexao.');
+        return [];
+      }
+
       if (axios.isAxiosError(error)) {
         const detail = (error.response?.data as any)?.detail;
         throw new Error(detail || 'Falha ao carregar todas as respostas do formulário.');

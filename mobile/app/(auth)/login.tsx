@@ -1,7 +1,12 @@
-import React, { useState } from 'react';
-import { 
-  View, Text, StyleSheet, TouchableOpacity, 
-  ActivityIndicator, Alert, ScrollView 
+import React from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  ActivityIndicator,
+  Alert,
+  ScrollView,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -25,23 +30,24 @@ export default function LoginScreen() {
   const handleLoginLocal = async () => {
     try {
       await handleLogin();
-    } catch (e) {
-      
-      showAlert("Falha no Acesso", "E-mail ou senha incorretos. Verifique e tente novamente.");
+    } catch {
+      showAlert('Falha no Acesso', 'E-mail ou senha incorretos. Verifique e tente novamente.');
     }
+  };
+
+  const handleFacebookLogin = () => {
+    Alert.alert(
+      'Facebook Login nao configurado',
+      'Para ativar, crie um app no Meta for Developers, configure o Facebook App ID e Client Token, e crie um endpoint no backend para validar o token.'
+    );
   };
 
   return (
     <SafeAreaView style={styles.container}>
-       {/* O componente fica "escondido" esperando o showAlert ser chamado */}
-       <SmartAlert 
-          {...alertConfig} 
-          onCancel={hideAlert} 
-       />
+      {/* O componente fica "escondido" esperando o showAlert ser chamado */}
+      <SmartAlert {...alertConfig} onCancel={hideAlert} />
       <ScrollView>
-
         <View style={styles.content}>
-          
           {/* Logo Centralizado */}
           <View style={styles.logoContainer}>
             <Logo size={40} />
@@ -50,7 +56,7 @@ export default function LoginScreen() {
 
           {/* Formulário */}
           <View style={styles.form}>
-            <CustomInput 
+            <CustomInput
               label="E-mail"
               value={email}
               onChangeText={setEmail}
@@ -58,25 +64,23 @@ export default function LoginScreen() {
               autoCapitalize="none"
             />
 
-            <CustomInput 
+            <CustomInput
               label="Senha"
               value={password}
               onChangeText={setPassword}
               secureTextEntry
             />
-            
-            <TouchableOpacity 
+
+            <TouchableOpacity
               onPress={() => router.push('/(auth)/recover')}
-              style={styles.forgotPass}
-            >
+              style={styles.forgotPass}>
               <Text style={styles.forgotText}>Esqueceu a senha?</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity 
-              style={styles.buttonMain} 
-              onPress={handleLogin}
-              disabled={loading}
-            >
+            <TouchableOpacity
+              style={styles.buttonMain}
+              onPress={handleLoginLocal}
+              disabled={loading}>
               {loading ? (
                 <ActivityIndicator color="#FFF" />
               ) : (
@@ -93,42 +97,38 @@ export default function LoginScreen() {
           </View>
 
           {/* Botões Sociais Largos */}
-        <View style={styles.socialContainer}>
-          <TouchableOpacity 
-            onPress={handleGoogleLogin}
-            disabled={googleLoading}
-            style={[styles.socialButton, { borderColor: '#DB4437' }]}
-          >
-            {googleLoading ? (
-              <ActivityIndicator color="#DB4437" />
-            ) : (
-              <>
-                <FontAwesome5 name="google" size={18} color="#DB4437" />
-                <Text style={styles.socialButtonText}>Entrar com Google</Text>
-              </>
-            )}
-          </TouchableOpacity>
+          <View style={styles.socialContainer}>
+            <TouchableOpacity
+              onPress={handleGoogleLogin}
+              disabled={googleLoading}
+              style={[styles.socialButton, { borderColor: '#DB4437' }]}>
+              {googleLoading ? (
+                <ActivityIndicator color="#DB4437" />
+              ) : (
+                <>
+                  <FontAwesome5 name="google" size={18} color="#DB4437" />
+                  <Text style={styles.socialButtonText}>Entrar com Google</Text>
+                </>
+              )}
+            </TouchableOpacity>
 
-          <TouchableOpacity 
-            onPress={() => console.log('Facebook Login')} 
-            style={[styles.socialButton, { borderColor: '#4267B2' }]}
-          >
-            <FontAwesome5 name="facebook" size={18} color="#4267B2" />
-            <Text style={styles.socialButtonText}>Entrar com Facebook</Text>
-          </TouchableOpacity>
-        </View>
+            <TouchableOpacity
+              onPress={handleFacebookLogin}
+              style={[styles.socialButton, { borderColor: '#4267B2' }]}>
+              <FontAwesome5 name="facebook" size={18} color="#4267B2" />
+              <Text style={styles.socialButtonText}>Entrar com Facebook</Text>
+            </TouchableOpacity>
+          </View>
 
-          <TouchableOpacity 
+          <TouchableOpacity
             onPress={() => router.push('/(auth)/register')}
-            style={styles.footerLink}
-          >
+            style={styles.footerLink}>
             <Text style={styles.footerLinkText}>
               Novo por aqui? <Text style={styles.footerLinkBold}>Criar conta</Text>
             </Text>
           </TouchableOpacity>
-
         </View>
-        
+
         <DeveloperFooter />
       </ScrollView>
     </SafeAreaView>
@@ -139,14 +139,14 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: THEME.colors.background },
   scrollContent: { flexGrow: 1 },
   content: { flex: 1, paddingHorizontal: 30, justifyContent: 'center', paddingTop: 50 },
-  
+
   logoContainer: { alignItems: 'center', marginBottom: 50 },
   tagline: { ...THEME.fonts.subtitle, fontSize: 14, marginTop: 5 },
 
   form: { width: '100%' },
   forgotPass: { alignSelf: 'flex-end', marginBottom: 25 },
   forgotText: { fontFamily: 'Manrope-Regular', color: THEME.colors.textSecondary, fontSize: 13 },
-  
+
   buttonMain: {
     height: 55,
     backgroundColor: THEME.colors.primary,
@@ -162,11 +162,15 @@ const styles = StyleSheet.create({
 
   dividerContainer: { flexDirection: 'row', alignItems: 'center', marginVertical: 30 },
   line: { flex: 1, height: 1, backgroundColor: THEME.colors.border },
-  dividerText: { marginHorizontal: 15, color: THEME.colors.textSecondary, fontFamily: 'Manrope-Regular' },
+  dividerText: {
+    marginHorizontal: 15,
+    color: THEME.colors.textSecondary,
+    fontFamily: 'Manrope-Regular',
+  },
 
-  socialContainer: { 
+  socialContainer: {
     gap: 15, // Espaçamento vertical entre os botões
-    marginTop: 10 
+    marginTop: 10,
   },
   socialButton: {
     flexDirection: 'row',
@@ -183,13 +187,13 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
   },
-  socialButtonText: { 
-    fontSize: 15, 
-    fontFamily: 'Manrope-SemiBold', 
-    color: THEME.colors.textPrimary 
+  socialButtonText: {
+    fontSize: 15,
+    fontFamily: 'Manrope-SemiBold',
+    color: THEME.colors.textPrimary,
   },
 
   footerLink: { marginTop: 40, marginBottom: 20, alignItems: 'center' },
   footerLinkText: { color: THEME.colors.textSecondary, fontFamily: 'Manrope-Regular' },
-  footerLinkBold: { color: THEME.colors.primary, fontFamily: 'Jakarta-Bold' }
+  footerLinkBold: { color: THEME.colors.primary, fontFamily: 'Jakarta-Bold' },
 });

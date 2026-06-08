@@ -65,7 +65,7 @@ export function useSync() {
     // Limpa residuos legados antes do sincronismo real.
     clearLegacySyncQueue();
 
-    // 1. Busca todas as ações pendentes no SQLite
+    // 1. Busca todas as aÃ§Ãµes pendentes no SQLite
     const pending: any[] = db.getAllSync(
       'SELECT * FROM sync_queue WHERE status = "pending" OR status = "error" OR status IS NULL ORDER BY id ASC'
     );
@@ -73,7 +73,7 @@ export function useSync() {
     if (pending.length === 0) return;
 
     setIsSyncing(true);
-    console.log(`🔄 Sincronismo iniciado: ${pending.length} itens pendentes.`);
+    console.log(`Sincronismo iniciado: ${pending.length} itens pendentes.`);
 
     const tempProjectIdMap = new Map<string, string>();
 
@@ -82,8 +82,8 @@ export function useSync() {
         const rawPayload = JSON.parse(action.payload);
         const payload = mapProjectIdInPayload(rawPayload, tempProjectIdMap);
         const endpoint = resolveEndpointWithProjectMap(action.endpoint, tempProjectIdMap);
-        
-        // 2. Tenta executar a chamada de rede baseada no método salvo
+
+        // 2. Tenta executar a chamada de rede baseada no mÃ©todo salvo
         if (endpoint.startsWith('/submissions') && action.method === 'POST') {
           await submissionRepository.send(payload);
         } else if (endpoint.startsWith('/submissions') && action.method === 'PATCH') {
@@ -97,25 +97,40 @@ export function useSync() {
           const response = await api.post(endpoint, body);
           const createdProject = response.data;
 
-          db.runSync(
-            'INSERT OR REPLACE INTO projects_cache (id, name, data) VALUES (?, ?, ?)',
-            [createdProject.id, createdProject.name, JSON.stringify(createdProject)]
-          );
+          db.runSync('INSERT OR REPLACE INTO projects_cache (id, name, data) VALUES (?, ?, ?)', [
+            createdProject.id,
+            createdProject.name,
+            JSON.stringify(createdProject),
+          ]);
 
           if (localTempId && typeof localTempId === 'string') {
             tempProjectIdMap.set(localTempId, createdProject.id);
 
             db.runSync('DELETE FROM projects_cache WHERE id = ?', [localTempId]);
-            db.runSync('UPDATE forms_cache SET projectId = ? WHERE projectId = ?', [createdProject.id, localTempId]);
+            db.runSync('UPDATE forms_cache SET projectId = ? WHERE projectId = ?', [
+              createdProject.id,
+              localTempId,
+            ]);
           }
         } else if (endpoint === '/forms/' && action.method === 'POST') {
-          const response = await api.post(endpoint, payload);
-          const createdForm = response.data;
+          const localTempId = payload._localTempId;
+          const body = { ...payload };
+          delete body._localTempId;
 
-          db.runSync(
-            'INSERT OR REPLACE INTO forms_cache (id, projectId, data) VALUES (?, ?, ?)',
-            [createdForm.id, createdForm.projectId, JSON.stringify(createdForm)]
-          );
+          const response = await api.post(endpoint, body);
+          const createdForm = response.data;
+          const projectId =
+            createdForm.projectId || createdForm.project_id || body.projectId || null;
+
+          db.runSync('INSERT OR REPLACE INTO forms_cache (id, projectId, data) VALUES (?, ?, ?)', [
+            createdForm.id,
+            projectId,
+            JSON.stringify(createdForm),
+          ]);
+
+          if (localTempId && typeof localTempId === 'string') {
+            db.runSync('DELETE FROM forms_cache WHERE id = ?', [localTempId]);
+          }
         } else if (action.method === 'POST') {
           await api.post(endpoint, payload);
         } else if (action.method === 'PATCH') {
@@ -126,34 +141,44 @@ export function useSync() {
 
         // 3. Se deu certo, remove da fila
         db.runSync('DELETE FROM sync_queue WHERE id = ?', [action.id]);
-        db.runSync(
-          'DELETE FROM sync_queue WHERE endpoint = ? AND method = ? AND (status = "pending" OR status = "error" OR status IS NULL)',
-          [action.endpoint, action.method]
-        );
-        console.log(`✅ Sincronizado: ${endpoint}`);
-
+        console.log(`Sincronizado: ${endpoint}`);
       } catch (error: any) {
         const status = axios.isAxiosError(error) ? error.response?.status : undefined;
         const detail = axios.isAxiosError(error)
-          ? ((error.response?.data as any)?.detail || error.message)
+          ? (error.response?.data as any)?.detail || error.message
           : error?.message;
-        const isPermanentDelete = action.method === 'DELETE' && action.endpoint.includes('/projects/') && action.endpoint.endsWith('/permanent');
+        const isPermanentDelete =
+          action.method === 'DELETE' &&
+          action.endpoint.includes('/projects/') &&
+          action.endpoint.endsWith('/permanent');
 
         // Casos nao-retryable para exclusao permanente:
         // 400: nao arquivado; 403: sem permissao; 404: ja nao existe; 500: erro legado/estado inconsistente.
-        if (isPermanentDelete && (status === 400 || status === 403 || status === 404 || status === 500)) {
-          console.warn(`⚠️ Removendo da fila (nao-retryable) ${action.endpoint}:`, detail);
+        if (
+          isPermanentDelete &&
+          (status === 400 || status === 403 || status === 404 || status === 500)
+        ) {
+          console.warn(`Removendo da fila (nao-retryable) ${action.endpoint}:`, detail);
           db.runSync('DELETE FROM sync_queue WHERE id = ?', [action.id]);
           continue;
         }
 
-        // Se falhar (ex: servidor offline / erro temporario), mantém para nova tentativa.
-        console.error(`❌ Falha ao sincronizar ${action.endpoint}:`, detail || error?.message);
+        // Se falhar (ex: servidor offline / erro temporario), mantem para nova tentativa.
+        console.error(`Falha ao sincronizar ${action.endpoint}:`, detail || error?.message);
 
         // 5xx vira error para facilitar diagnostico; demais continuam pending.
         const nextStatus = status && status >= 500 ? 'error' : 'pending';
         db.runSync('UPDATE sync_queue SET status = ? WHERE id = ?', [nextStatus, action.id]);
       }
+    }
+
+    const remaining: any = db.getFirstSync(
+      'SELECT COUNT(*) as count FROM sync_queue WHERE status = "pending" OR status = "error" OR status IS NULL'
+    );
+
+    if (remaining?.count > 0) {
+      setIsSyncing(false);
+      return;
     }
 
     try {
@@ -162,13 +187,17 @@ export function useSync() {
       db.runSync("DELETE FROM projects_cache WHERE id LIKE 'temp-%'");
       db.runSync('DELETE FROM projects_cache');
       for (const p of projects) {
-        db.runSync(
-          'INSERT OR REPLACE INTO projects_cache (id, name, data) VALUES (?, ?, ?)',
-          [p.id, p.name, JSON.stringify(p)]
-        );
+        db.runSync('INSERT OR REPLACE INTO projects_cache (id, name, data) VALUES (?, ?, ?)', [
+          p.id,
+          p.name,
+          JSON.stringify(p),
+        ]);
       }
     } catch (cacheRefreshError) {
-      console.warn('Nao foi possivel atualizar cache de projetos apos sincronismo:', cacheRefreshError);
+      console.warn(
+        'Nao foi possivel atualizar cache de projetos apos sincronismo:',
+        cacheRefreshError
+      );
     }
 
     setIsSyncing(false);

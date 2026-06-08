@@ -21,6 +21,7 @@ import {
 // Camada de Dados e Estilo
 import { useAuthStore } from '@/presentation/auth/store/useAuthStore';
 import { initDatabase } from '@/services/sqlite';
+import { useNotificationNavigation } from '@/services/notifications/pushNotifications';
 import { useSync } from '@/presentation/shared/hooks/useSync';
 import { THEME } from '@/styles/theme';
 
@@ -42,6 +43,7 @@ export default function RootLayout() {
   const segments = useSegments();
   const router = useRouter();
   const [authHydrated, setAuthHydrated] = useState(false);
+  useNotificationNavigation(fontsLoaded && authHydrated && isAuthenticated);
 
   // 0. Hidrata sessao local para permitir entrar no app offline.
   useEffect(() => {
@@ -121,6 +123,7 @@ export default function RootLayout() {
       }}>
         <Stack.Screen name="(auth)" />
         <Stack.Screen name="(drawer)" />
+        <Stack.Screen name="(project)" />
         <Stack.Screen name="modal" options={{ presentation: 'modal' }} />
       </Stack>
     </SafeAreaProvider>

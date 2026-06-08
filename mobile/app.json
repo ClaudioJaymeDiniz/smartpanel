@@ -1,16 +1,18 @@
 {
   "expo": {
     "name": "mobile",
-    "slug": "mobile",
+    "slug": "smartpanel",
     "version": "1.0.0",
     "scheme": "mobile",
-    "platforms": ["ios", "android", "web"],
-
+    "platforms": [
+      "ios",
+      "android",
+      "web"
+    ],
     "web": {
       "bundler": "metro",
       "output": "static"
     },
-
     "plugins": [
       "expo-router",
       "expo-secure-store",
@@ -18,24 +20,35 @@
       "expo-sqlite",
       "expo-notifications"
     ],
-
     "experiments": {
       "typedRoutes": true,
       "tsconfigPaths": true
     },
-
     "orientation": "portrait",
     "userInterfaceStyle": "light",
-
-    "assetBundlePatterns": ["**/*"],
-
+    "assetBundlePatterns": [
+      "**/*"
+    ],
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSAppTransportSecurity": {
+          "NSAllowsArbitraryLoads": true
+        }
+      }
     },
-
     "android": {
       "googleServicesFile": "./google-services.json",
-      "package": "sm.app"
-    }
+      "package": "sm.app",
+      "usesCleartextTraffic": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "41757995-6bb4-46dd-adee-e85228f90696"
+        
+      }
+    },
+    "owner": "clayver"
   }
 }

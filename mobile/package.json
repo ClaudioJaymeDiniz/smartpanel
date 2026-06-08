@@ -5,6 +5,8 @@
   "scripts": {
     "android": "expo run:android",
     "android:dev": "expo run:android",
+    "android:apk-debug": "cd android && gradlew.bat assembleDebug",
+    "android:apk-release": "cd android && gradlew.bat assembleRelease",
     "ios": "expo run:ios",
     "ios:dev": "expo run:ios",
     "start": "expo start",
@@ -24,6 +26,7 @@
     "@react-navigation/native": "^7.1.8",
     "axios": "^1.14.0",
     "expo": "54.0.6",
+    "expo-auth-session": "~7.0.8",
     "expo-constants": "~18.0.9",
     "expo-crypto": "~15.0.8",
     "expo-dev-client": "~6.0.21",

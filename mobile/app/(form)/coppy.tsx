@@ -23,6 +23,7 @@ import { FormRepositoryImpl } from '@/data/forms/repositories/FormRepositoryImpl
 
 export default function FormDetails() {
   const { id } = useLocalSearchParams();
+  const formId = Array.isArray(id) ? id[0] : id;
   const router = useRouter();
   const { user } = useAuthStore();
   const formRepo = new FormRepositoryImpl();
@@ -39,7 +40,7 @@ export default function FormDetails() {
     mySubmission,
     setRefreshing,
     loadData,
-  } = useFormDetails(id as string, user?.id);
+  } = useFormDetails(formId ?? '', user?.id);
 
   const accentColor = projectColor || THEME.colors.primary;
   const accentSoft = `${accentColor}10`;
@@ -58,7 +59,10 @@ export default function FormDetails() {
 
   const openAnswerScreen = () => {
     if (isFormArchived) {
-      Alert.alert('Formulario arquivado', 'Este formulario foi arquivado e nao aceita novas respostas.');
+      Alert.alert(
+        'Formulario arquivado',
+        'Este formulario foi arquivado e nao aceita novas respostas.'
+      );
       return;
     }
 
@@ -141,7 +145,8 @@ export default function FormDetails() {
               await loadData();
               Alert.alert('Sucesso', 'Formulario arquivado com sucesso.');
             } catch (error) {
-              const message = error instanceof Error ? error.message : 'Nao foi possivel arquivar o formulario.';
+              const message =
+                error instanceof Error ? error.message : 'Nao foi possivel arquivar o formulario.';
               Alert.alert('Erro', message);
             }
           },
@@ -156,33 +161,31 @@ export default function FormDetails() {
       await loadData();
       Alert.alert('Sucesso', 'Formulario restaurado com sucesso.');
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Nao foi possivel restaurar o formulario.';
+      const message =
+        error instanceof Error ? error.message : 'Nao foi possivel restaurar o formulario.';
       Alert.alert('Erro', message);
     }
   };
 
   const handlePermanentDelete = () => {
-    Alert.alert(
-      'Excluir definitivamente?',
-      'Essa acao nao pode ser desfeita.',
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        {
-          text: 'Excluir',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await formRepo.permanentDelete(id as string);
-              Alert.alert('Sucesso', 'Formulario excluido definitivamente.');
-              router.back();
-            } catch (error) {
-              const message = error instanceof Error ? error.message : 'Nao foi possivel excluir o formulario.';
-              Alert.alert('Erro', message);
-            }
-          },
+    Alert.alert('Excluir definitivamente?', 'Essa acao nao pode ser desfeita.', [
+      { text: 'Cancelar', style: 'cancel' },
+      {
+        text: 'Excluir',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await formRepo.permanentDelete(id as string);
+            Alert.alert('Sucesso', 'Formulario excluido definitivamente.');
+            router.back();
+          } catch (error) {
+            const message =
+              error instanceof Error ? error.message : 'Nao foi possivel excluir o formulario.';
+            Alert.alert('Erro', message);
+          }
         },
-      ]
-    );
+      },
+    ]);
   };
 
   const goBack = () => {
@@ -220,8 +223,7 @@ export default function FormDetails() {
           <TouchableOpacity
             style={styles.imageThumbRow}
             onPress={() => setPreviewImage(maybeUri)}
-            activeOpacity={0.85}
-          >
+            activeOpacity={0.85}>
             <Image source={{ uri: maybeUri }} style={styles.imageThumb} />
             <Text style={styles.imageThumbHint}>Toque para ampliar</Text>
           </TouchableOpacity>
@@ -237,8 +239,7 @@ export default function FormDetails() {
         <TouchableOpacity
           style={styles.imageThumbRow}
           onPress={() => setPreviewImage(imageUrl)}
-          activeOpacity={0.85}
-        >
+          activeOpacity={0.85}>
           <Image source={{ uri: imageUrl }} style={styles.imageThumb} />
           <Text style={styles.imageThumbHint}>Toque para ampliar</Text>
         </TouchableOpacity>
@@ -278,15 +279,19 @@ export default function FormDetails() {
             }}
             colors={[THEME.colors.primary]}
           />
-        }
-      >
+        }>
         <Container>
-          <TouchableOpacity style={styles.backButton} onPress={goBack} accessibilityLabel="Voltar página">
+          <TouchableOpacity
+            style={styles.backButton}
+            onPress={goBack}
+            accessibilityLabel="Voltar página">
             <Ionicons name="arrow-back" size={22} color={accentColor} />
           </TouchableOpacity>
 
           <Text style={styles.title}>{form?.title}</Text>
-          <Text style={styles.description}>{form?.description || 'Visualize as respostas enviadas.'}</Text>
+          <Text style={styles.description}>
+            {form?.description || 'Visualize as respostas enviadas.'}
+          </Text>
 
           <View style={styles.summaryRow}>
             <View style={styles.summaryCard}>
@@ -300,14 +305,24 @@ export default function FormDetails() {
           </View>
 
           {!isOwner ? (
-            <View style={[styles.restrictedBanner, { backgroundColor: accentSoft, borderColor: accentBorder }]}>
+            <View
+              style={[
+                styles.restrictedBanner,
+                { backgroundColor: accentSoft, borderColor: accentBorder },
+              ]}>
               <Ionicons name="lock-closed-outline" size={18} color={accentColor} />
-              <Text style={[styles.restrictedBannerText, { color: accentColor }]}>Você vê apenas suas respostas. O total do formulário continua disponível acima.</Text>
+              <Text style={[styles.restrictedBannerText, { color: accentColor }]}>
+                Você vê apenas suas respostas. O total do formulário continua disponível acima.
+              </Text>
             </View>
           ) : null}
 
           {isOwner && isFormArchived ? (
-            <View style={[styles.archivedBanner, { backgroundColor: accentSoft, borderColor: accentBorder }]}>
+            <View
+              style={[
+                styles.archivedBanner,
+                { backgroundColor: accentSoft, borderColor: accentBorder },
+              ]}>
               <Ionicons name="archive-outline" size={18} color="#64748B" />
               <Text style={styles.archivedBannerText}>Formulario arquivado</Text>
             </View>
@@ -318,31 +333,71 @@ export default function FormDetails() {
               <View style={styles.ownerActions}>
                 {!isFormArchived ? (
                   <>
-                    <TouchableOpacity style={[styles.secondaryButton, { backgroundColor: accentSoft, borderColor: accentBorder }]} onPress={openEditForm}>
+                    <TouchableOpacity
+                      style={[
+                        styles.secondaryButton,
+                        { backgroundColor: accentSoft, borderColor: accentBorder },
+                      ]}
+                      onPress={openEditForm}>
                       <Ionicons name="build-outline" size={16} color={accentColor} />
-                      <Text style={[styles.secondaryButtonText, { color: accentColor }]}>Editar formulario</Text>
+                      <Text style={[styles.secondaryButtonText, { color: accentColor }]}>
+                        Editar formulario
+                      </Text>
                     </TouchableOpacity>
 
-                    <TouchableOpacity style={[styles.secondaryButton, { backgroundColor: accentSoft, borderColor: accentBorder }]} onPress={() => router.push({ pathname: '/(dashboard)/[formularioId]/analitics', params: { formularioId: id } })}>
+                    <TouchableOpacity
+                      style={[
+                        styles.secondaryButton,
+                        { backgroundColor: accentSoft, borderColor: accentBorder },
+                      ]}
+                      onPress={() =>
+                        router.push({
+                          pathname: '/(dashboard)/[formularioId]/analitics',
+                          params: { formularioId: formId ?? '' },
+                        })
+                      }>
                       <Ionicons name="analytics-outline" size={16} color={accentColor} />
-                      <Text style={[styles.secondaryButtonText, { color: accentColor }]}>Analytics</Text>
+                      <Text style={[styles.secondaryButtonText, { color: accentColor }]}>
+                        Analytics
+                      </Text>
                     </TouchableOpacity>
 
-                    <TouchableOpacity style={[styles.secondaryButton, { backgroundColor: accentSoft, borderColor: accentBorder }]} onPress={handleExportCsv}>
+                    <TouchableOpacity
+                      style={[
+                        styles.secondaryButton,
+                        { backgroundColor: accentSoft, borderColor: accentBorder },
+                      ]}
+                      onPress={handleExportCsv}>
                       <Ionicons name="download-outline" size={16} color={accentColor} />
-                      <Text style={[styles.secondaryButtonText, { color: accentColor }]}>Baixar CSV</Text>
+                      <Text style={[styles.secondaryButtonText, { color: accentColor }]}>
+                        Baixar CSV
+                      </Text>
                     </TouchableOpacity>
 
-                    <TouchableOpacity style={[styles.secondaryButton, { backgroundColor: accentSoft, borderColor: accentBorder }]} onPress={handleArchiveForm}>
+                    <TouchableOpacity
+                      style={[
+                        styles.secondaryButton,
+                        { backgroundColor: accentSoft, borderColor: accentBorder },
+                      ]}
+                      onPress={handleArchiveForm}>
                       <Ionicons name="archive-outline" size={16} color={accentColor} />
-                      <Text style={[styles.secondaryButtonText, { color: accentColor }]}>Arquivar formulario</Text>
+                      <Text style={[styles.secondaryButtonText, { color: accentColor }]}>
+                        Arquivar formulario
+                      </Text>
                     </TouchableOpacity>
                   </>
                 ) : (
                   <>
-                    <TouchableOpacity style={[styles.secondaryButton, { backgroundColor: accentSoft, borderColor: accentBorder }]} onPress={handleRestoreForm}>
+                    <TouchableOpacity
+                      style={[
+                        styles.secondaryButton,
+                        { backgroundColor: accentSoft, borderColor: accentBorder },
+                      ]}
+                      onPress={handleRestoreForm}>
                       <Ionicons name="arrow-undo-outline" size={16} color={accentColor} />
-                      <Text style={[styles.secondaryButtonText, { color: accentColor }]}>Restaurar formulario</Text>
+                      <Text style={[styles.secondaryButtonText, { color: accentColor }]}>
+                        Restaurar formulario
+                      </Text>
                     </TouchableOpacity>
 
                     <TouchableOpacity style={styles.dangerButton} onPress={handlePermanentDelete}>
@@ -353,10 +408,20 @@ export default function FormDetails() {
                 )}
               </View>
             ) : (
-              <TouchableOpacity style={[styles.primaryButton, (isProjectArchived || isFormArchived) && styles.disabledButton]} onPress={openAnswerScreen} disabled={isProjectArchived || isFormArchived}>
+              <TouchableOpacity
+                style={[
+                  styles.primaryButton,
+                  (isProjectArchived || isFormArchived) && styles.disabledButton,
+                ]}
+                onPress={openAnswerScreen}
+                disabled={isProjectArchived || isFormArchived}>
                 <Ionicons name="paper-plane-outline" size={16} color="#FFF" />
                 <Text style={styles.primaryButtonText}>
-                  {isFormArchived ? 'Formulario arquivado' : isProjectArchived ? 'Projeto arquivado' : 'Responder formulario'}
+                  {isFormArchived
+                    ? 'Formulario arquivado'
+                    : isProjectArchived
+                      ? 'Projeto arquivado'
+                      : 'Responder formulario'}
                 </Text>
               </TouchableOpacity>
             )}
@@ -384,12 +449,20 @@ export default function FormDetails() {
 
               return (
                 <View key={submission.id} style={styles.card}>
-                  <TouchableOpacity style={styles.cardHeaderButton} onPress={() => toggleExpanded(submission.id)}>
+                  <TouchableOpacity
+                    style={styles.cardHeaderButton}
+                    onPress={() => toggleExpanded(submission.id)}>
                     <View style={styles.cardHeader}>
                       <View style={styles.authorRow}>
-                        <Ionicons name="person-circle-outline" size={18} color={THEME.colors.textSecondary} />
+                        <Ionicons
+                          name="person-circle-outline"
+                          size={18}
+                          color={THEME.colors.textSecondary}
+                        />
                         <Text style={styles.authorText}>
-                          {submission.user?.name || submission.user?.email || (isMine ? 'Minha resposta' : 'Coletor')}
+                          {submission.user?.name ||
+                            submission.user?.email ||
+                            (isMine ? 'Minha resposta' : 'Coletor')}
                         </Text>
                         <Ionicons
                           name={isExpanded ? 'chevron-up-outline' : 'chevron-down-outline'}
@@ -398,7 +471,9 @@ export default function FormDetails() {
                         />
                       </View>
                     </View>
-                    <Text style={styles.dateText}>{new Date(submission.createdAt).toLocaleString('pt-BR')}</Text>
+                    <Text style={styles.dateText}>
+                      {new Date(submission.createdAt).toLocaleString('pt-BR')}
+                    </Text>
                   </TouchableOpacity>
 
                   {isExpanded ? (
@@ -410,10 +485,14 @@ export default function FormDetails() {
                         </View>
                       ))}
 
-                      {fields.length === 0 ? <Text style={styles.moreText}>Sem campos nesta resposta.</Text> : null}
+                      {fields.length === 0 ? (
+                        <Text style={styles.moreText}>Sem campos nesta resposta.</Text>
+                      ) : null}
 
                       {isMine && !isOwner && (
-                        <TouchableOpacity style={styles.inlineEdit} onPress={() => openEditSubmission(submission.id)}>
+                        <TouchableOpacity
+                          style={styles.inlineEdit}
+                          onPress={() => openEditSubmission(submission.id)}>
                           <Ionicons name="create-outline" size={14} color={THEME.colors.primary} />
                           <Text style={styles.inlineEditText}>Editar esta resposta</Text>
                         </TouchableOpacity>
@@ -427,10 +506,18 @@ export default function FormDetails() {
         </Container>
       </ScrollView>
 
-      <Modal visible={Boolean(previewImage)} transparent animationType="fade" onRequestClose={() => setPreviewImage(null)}>
+      <Modal
+        visible={Boolean(previewImage)}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setPreviewImage(null)}>
         <Pressable style={styles.previewBackdrop} onPress={() => setPreviewImage(null)}>
           {previewImage ? (
-            <Image source={{ uri: previewImage }} style={styles.previewImage} resizeMode="contain" />
+            <Image
+              source={{ uri: previewImage }}
+              style={styles.previewImage}
+              resizeMode="contain"
+            />
           ) : null}
         </Pressable>
       </Modal>
@@ -440,7 +527,12 @@ export default function FormDetails() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: THEME.colors.background },
-  centered: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: THEME.colors.background },
+  centered: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: THEME.colors.background,
+  },
   scroll: { paddingVertical: 20 },
   title: { fontSize: 24, fontFamily: 'Jakarta-Bold', color: THEME.colors.textPrimary },
   description: { marginTop: 6, marginBottom: 18, color: THEME.colors.textSecondary, fontSize: 14 },
@@ -454,7 +546,12 @@ const styles = StyleSheet.create({
     backgroundColor: THEME.colors.surface,
   },
   summaryValue: { fontFamily: 'Jakarta-Bold', fontSize: 22, color: THEME.colors.textPrimary },
-  summaryLabel: { marginTop: 2, fontFamily: 'Manrope-Regular', fontSize: 12, color: THEME.colors.textSecondary },
+  summaryLabel: {
+    marginTop: 2,
+    fontFamily: 'Manrope-Regular',
+    fontSize: 12,
+    color: THEME.colors.textSecondary,
+  },
   restrictedBanner: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -527,7 +624,13 @@ const styles = StyleSheet.create({
     marginBottom: 14,
   },
   archivedBannerText: { color: '#475569', fontFamily: 'Jakarta-SemiBold', fontSize: 13 },
-  sectionTitle: { marginTop: 6, marginBottom: 10, fontSize: 16, fontFamily: 'Jakarta-Bold', color: THEME.colors.textPrimary },
+  sectionTitle: {
+    marginTop: 6,
+    marginBottom: 10,
+    fontSize: 16,
+    fontFamily: 'Jakarta-Bold',
+    color: THEME.colors.textPrimary,
+  },
   emptyState: {
     marginTop: 10,
     borderRadius: 16,
@@ -537,7 +640,12 @@ const styles = StyleSheet.create({
     padding: 24,
     alignItems: 'center',
   },
-  emptyTitle: { marginTop: 10, fontFamily: 'Jakarta-Bold', color: THEME.colors.textPrimary, fontSize: 15 },
+  emptyTitle: {
+    marginTop: 10,
+    fontFamily: 'Jakarta-Bold',
+    color: THEME.colors.textPrimary,
+    fontSize: 15,
+  },
   emptySubtitle: { marginTop: 4, color: THEME.colors.textSecondary, textAlign: 'center' },
   card: {
     backgroundColor: THEME.colors.surface,
@@ -571,7 +679,13 @@ const styles = StyleSheet.create({
   fieldKey: { color: THEME.colors.textSecondary, fontSize: 12, fontFamily: 'Jakarta-SemiBold' },
   fieldValue: { color: THEME.colors.textPrimary, fontSize: 13, flex: 1 },
   moreText: { marginTop: 6, color: THEME.colors.textSecondary, fontSize: 12 },
-  inlineEdit: { marginTop: 10, flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start' },
+  inlineEdit: {
+    marginTop: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    alignSelf: 'flex-start',
+  },
   inlineEditText: { color: THEME.colors.primary, fontFamily: 'Jakarta-Bold', fontSize: 12 },
   previewBackdrop: {
     flex: 1,
